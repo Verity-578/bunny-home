@@ -1,0 +1,11 @@
+# Project scratch and local secrets
+outputs/
+work/
+.pnpm-store/
+.env
+.env.*
+!.env.example
+data/
+node_modules/
+dist/
+*.log

@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: bunny-home
+    runtime: node
+    plan: free
+    healthCheckPath: /api/health
+    buildCommand: cd bunny-home-frontend && npm install && npm run build && cd ../bunny-home-backend && npm install
+    startCommand: node bunny-home-backend/src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com
+      - key: DEEPSEEK_MODEL
+        value: deepseek-chat
