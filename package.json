@@ -2,7 +2,6 @@
   "name": "bunny-home",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "build:frontend": "cd bunny-home-frontend && npm install && npm run build"
   },
