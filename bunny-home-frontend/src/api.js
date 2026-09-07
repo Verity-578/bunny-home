@@ -1,9 +1,35 @@
 const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const passwordKey = 'bunny_access_password';
+
+export function getStoredPassword() {
+  return sessionStorage.getItem(passwordKey) || '';
+}
+
+export function storePassword(password) {
+  sessionStorage.setItem(passwordKey, password);
+}
+
+export function getAuthStatus() {
+  const password = getStoredPassword();
+  return apiRequest('/api/auth/status', {
+    headers: password ? { 'x-access-password': password } : {},
+  });
+}
+
+export function verifyPassword(password) {
+  return apiRequest('/api/auth/verify', {
+    method: 'POST',
+    headers: { 'x-access-password': password },
+    body: JSON.stringify({ password }),
+  });
+}
 
 export async function apiRequest(path, options = {}) {
+  const password = getStoredPassword();
   const response = await fetch(`${baseUrl}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(password ? { 'x-access-password': password } : {}),
       ...options.headers,
     },
     ...options,

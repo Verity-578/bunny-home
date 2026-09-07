@@ -3,6 +3,7 @@ import {
   ArrowUp,
   Check,
   House,
+  LockKeyhole,
   Menu,
   Pencil,
   Plus,
@@ -15,13 +16,16 @@ import {
 import {
   createSession,
   deleteSession,
+  getAuthStatus,
   getModels,
   getSettings,
   listMessages,
   listSessions,
   renameSession,
   sendMessage,
+  storePassword,
   updateSettings,
+  verifyPassword,
 } from './api.js';
 
 function formatTime(value) {
@@ -54,11 +58,28 @@ export default function App() {
   const [connectionError, setConnectionError] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
+  const [authState, setAuthState] = useState('loading');
   const bottomRef = useRef(null);
 
   const activeSession = sessions.find((session) => session.id === activeId) || null;
 
   useEffect(() => {
+    let cancelled = false;
+    getAuthStatus()
+      .then((status) => {
+        if (cancelled) return;
+        setAuthState(status.required && !status.authenticated ? 'locked' : 'ready');
+      })
+      .catch(() => {
+        if (!cancelled) setAuthState('ready');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authState !== 'ready') return;
     let cancelled = false;
     async function boot() {
       try {
@@ -85,7 +106,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,6 +224,16 @@ export default function App() {
     } catch (error) {
       setConnectionError(error.message);
     }
+  }
+
+  async function handleUnlock(password) {
+    await verifyPassword(password);
+    storePassword(password);
+    setAuthState('ready');
+  }
+
+  if (authState !== 'ready') {
+    return <AuthGate state={authState} onUnlock={handleUnlock} />;
   }
 
   return (
@@ -438,6 +469,65 @@ export default function App() {
         />
       )}
     </div>
+  );
+}
+
+function AuthGate({ state, onUnlock }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [checking, setChecking] = useState(false);
+
+  if (state === 'loading') {
+    return (
+      <main className="auth-screen">
+        <div className="auth-loading" aria-label="加载中">
+          <Sparkles size={20} />
+          Bunny's Home
+        </div>
+      </main>
+    );
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!password || checking) return;
+    setChecking(true);
+    setError('');
+    try {
+      await onUnlock(password);
+    } catch {
+      setError('密码不对，再试一次');
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return (
+    <main className="auth-screen">
+      <div className="auth-card">
+        <div className="auth-icon">
+          <LockKeyhole size={24} />
+        </div>
+        <div className="auth-copy">
+          <strong>Bunny's Home</strong>
+          <span>我们的地方</span>
+        </div>
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <input
+            type="password"
+            autoFocus
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="输入访问密码"
+            aria-label="访问密码"
+          />
+          <button type="submit" className="auth-submit" disabled={!password || checking}>
+            <ArrowUp size={18} />
+          </button>
+        </form>
+        {error && <p className="auth-error">{error}</p>}
+      </div>
+    </main>
   );
 }
 

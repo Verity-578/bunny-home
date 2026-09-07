@@ -3,9 +3,11 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
+import { authMiddleware } from './auth.js';
 import { config } from './config.js';
 import { HttpError } from './errors.js';
 import healthRouter from './routes/health.js';
+import authRouter from './routes/auth.js';
 import messagesRouter from './routes/messages.js';
 import modelsRouter from './routes/models.js';
 import sessionsRouter from './routes/sessions.js';
@@ -33,6 +35,8 @@ export function createApp() {
     });
   }
   app.use('/api/health', healthRouter);
+  app.use('/api/auth', authRouter);
+  app.use(authMiddleware);
   app.use('/api/sessions', sessionsRouter);
   app.use('/api/sessions', messagesRouter);
   app.use('/api/settings', settingsRouter);
