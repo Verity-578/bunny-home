@@ -9,7 +9,7 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'cjs',
-  outfile: path.join(root, 'netlify-build/api.js'),
+  outfile: path.join(root, 'netlify-build/api.cjs'),
   alias: {
     'node:sqlite': path.join(root, 'netlify/empty-sqlite.cjs'),
   },
