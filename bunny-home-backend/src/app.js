@@ -36,7 +36,7 @@ export function createApp() {
   }
   app.use('/api/health', healthRouter);
   app.use('/api/auth', authRouter);
-  app.use(authMiddleware);
+  app.use('/api', authMiddleware);
   app.use('/api/sessions', sessionsRouter);
   app.use('/api/sessions', messagesRouter);
   app.use('/api/settings', settingsRouter);

@@ -27,12 +27,12 @@ export function verifyPassword(password) {
 export async function apiRequest(path, options = {}) {
   const password = getStoredPassword();
   const response = await fetch(`${baseUrl}${path}`, {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...(password ? { 'x-access-password': password } : {}),
       ...options.headers,
     },
-    ...options,
   });
 
   const data = await response.json().catch(() => null);
