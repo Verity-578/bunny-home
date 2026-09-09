@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
   lastProactiveAt: null,
   memoryCollectionEnabled: true,
   memoryEveryMessages: 8,
+  memorySharedAcrossSessions: true,
 };
 
 const SETTING_COLUMNS = {
@@ -46,6 +47,7 @@ const SETTING_COLUMNS = {
   lastProactiveAt: 'last_proactive_at',
   memoryCollectionEnabled: 'memory_collection_enabled',
   memoryEveryMessages: 'memory_every_messages',
+  memorySharedAcrossSessions: 'memory_shared_across_sessions',
 };
 
 function mapSession(row) {
@@ -123,6 +125,7 @@ function mapSettings(row) {
     lastProactiveAt: row.last_proactive_at,
     memoryCollectionEnabled: Boolean(row.memory_collection_enabled),
     memoryEveryMessages: Number(row.memory_every_messages || 8),
+    memorySharedAcrossSessions: Boolean(row.memory_shared_across_sessions),
     updatedAt: row.updated_at,
   };
 }
@@ -315,6 +318,7 @@ export class SupabaseStore {
         last_proactive_at: null,
         memory_collection_enabled: DEFAULT_SETTINGS.memoryCollectionEnabled,
         memory_every_messages: DEFAULT_SETTINGS.memoryEveryMessages,
+        memory_shared_across_sessions: DEFAULT_SETTINGS.memorySharedAcrossSessions,
         updated_at: nowIso(),
       })
       .select()

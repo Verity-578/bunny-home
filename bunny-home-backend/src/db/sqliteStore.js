@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS = {
   lastProactiveAt: null,
   memoryCollectionEnabled: true,
   memoryEveryMessages: 8,
+  memorySharedAcrossSessions: true,
 };
 
 const SETTING_FIELDS = {
@@ -45,6 +46,7 @@ const SETTING_FIELDS = {
   lastProactiveAt: 'last_proactive_at',
   memoryCollectionEnabled: 'memory_collection_enabled',
   memoryEveryMessages: 'memory_every_messages',
+  memorySharedAcrossSessions: 'memory_shared_across_sessions',
 };
 
 const sessionSelect = `
@@ -116,6 +118,7 @@ export class SqliteStore {
         last_proactive_at TEXT,
         memory_collection_enabled INTEGER NOT NULL DEFAULT 1,
         memory_every_messages INTEGER NOT NULL DEFAULT 8,
+        memory_shared_across_sessions INTEGER NOT NULL DEFAULT 1,
         updated_at TEXT NOT NULL
       );
 
@@ -159,6 +162,7 @@ export class SqliteStore {
     this.ensureColumn('settings', 'last_proactive_at', 'TEXT');
     this.ensureColumn('settings', 'memory_collection_enabled', 'INTEGER NOT NULL DEFAULT 1');
     this.ensureColumn('settings', 'memory_every_messages', 'INTEGER NOT NULL DEFAULT 8');
+    this.ensureColumn('settings', 'memory_shared_across_sessions', 'INTEGER NOT NULL DEFAULT 1');
   }
 
   ensureColumn(table, column, definition) {
@@ -180,8 +184,8 @@ export class SqliteStore {
           max_reply_tokens, theme_color, persona_prompt, language_style_prompt,
           proactive_enabled, proactive_interval_minutes, proactive_batch_count,
           proactive_quiet_start, proactive_quiet_end, last_proactive_at,
-          memory_collection_enabled, memory_every_messages, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          memory_collection_enabled, memory_every_messages, memory_shared_across_sessions, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         1,
@@ -204,6 +208,7 @@ export class SqliteStore {
         null,
         DEFAULT_SETTINGS.memoryCollectionEnabled ? 1 : 0,
         DEFAULT_SETTINGS.memoryEveryMessages,
+        DEFAULT_SETTINGS.memorySharedAcrossSessions ? 1 : 0,
         nowIso(),
       );
   }
@@ -359,6 +364,7 @@ export class SqliteStore {
           last_proactive_at AS lastProactiveAt,
           memory_collection_enabled AS memoryCollectionEnabled,
           memory_every_messages AS memoryEveryMessages,
+          memory_shared_across_sessions AS memorySharedAcrossSessions,
           updated_at AS updatedAt
         FROM settings
         WHERE id = 1
@@ -373,6 +379,7 @@ export class SqliteStore {
       proactiveEnabled: Boolean(row.proactiveEnabled),
       memoryCollectionEnabled: Boolean(row.memoryCollectionEnabled),
       memoryEveryMessages: Number(row.memoryEveryMessages || 8),
+      memorySharedAcrossSessions: Boolean(row.memorySharedAcrossSessions),
     };
   }
 
@@ -384,7 +391,9 @@ export class SqliteStore {
       if (patch[key] === undefined) continue;
       assignments.push(`${column} = ?`);
       values.push(
-        key === 'proactiveEnabled' || key === 'memoryCollectionEnabled'
+        key === 'proactiveEnabled' ||
+        key === 'memoryCollectionEnabled' ||
+        key === 'memorySharedAcrossSessions'
           ? (patch[key] ? 1 : 0)
           : patch[key],
       );

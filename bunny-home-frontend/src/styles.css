@@ -521,6 +521,10 @@ button {
   margin-top: 12px;
 }
 
+.memory-share-row {
+  margin-top: 10px;
+}
+
 .field {
   flex-direction: column;
   gap: 8px;

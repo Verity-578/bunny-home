@@ -45,6 +45,9 @@ router.put(
     if (typeof input.memoryCollectionEnabled === 'boolean') {
       patch.memoryCollectionEnabled = input.memoryCollectionEnabled;
     }
+    if (typeof input.memorySharedAcrossSessions === 'boolean') {
+      patch.memorySharedAcrossSessions = input.memorySharedAcrossSessions;
+    }
 
     const numberFields = [
       'temperature',

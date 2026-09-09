@@ -53,6 +53,7 @@ create table public.settings (
   last_proactive_at timestamptz,
   memory_collection_enabled boolean not null default true,
   memory_every_messages integer not null default 8,
+  memory_shared_across_sessions boolean not null default true,
   updated_at timestamptz not null default now()
 );
 
@@ -102,6 +103,9 @@ alter table public.settings
 
 alter table public.settings
   add column if not exists memory_every_messages integer not null default 8;
+
+alter table public.settings
+  add column if not exists memory_shared_across_sessions boolean not null default true;
 
 create table if not exists public.memory_entries (
   id uuid primary key default gen_random_uuid(),

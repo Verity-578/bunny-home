@@ -10,7 +10,7 @@ function estimateTokens(text) {
   return Math.ceil((text || '').length / 4);
 }
 
-export function buildFullPrompt({ settings, messages, memories, message }) {
+export function buildFullPrompt({ settings, messages, memories, memoryLibraryText = '', message }) {
   const persona = settings.personaPrompt || settings.systemPrompt || '';
   const languageStyle = settings.languageStylePrompt || '';
   const memoryText = (memories || [])
@@ -24,6 +24,7 @@ export function buildFullPrompt({ settings, messages, memories, message }) {
   const sections = [persona];
   if (languageStyle) sections.push(`【语言风格】\n${languageStyle}`);
   sections.push(`当前时间：${new Date().toLocaleString('zh-CN', { hour12: false })}`);
+  if (memoryLibraryText) sections.push(`【个人记忆库】\n${memoryLibraryText}`);
   if (memoryText) sections.push(`【长期记忆】\n${memoryText}`);
   if (historyText) sections.push(`【当前对话】\n${historyText}`);
 
@@ -34,6 +35,25 @@ export function buildFullPrompt({ settings, messages, memories, message }) {
     historyText,
     tokenEstimate: estimateTokens(fullPrompt) + estimateTokens(message),
   };
+}
+
+async function getMemoryLibraryText({ sessionId, settings }) {
+  const all = await storage.listMemoryEntries(2000);
+  const relevant = settings.memorySharedAcrossSessions
+    ? all
+    : all.filter(
+        (entry) =>
+          !entry.sourceSessionId ||
+          entry.sourceSessionId === sessionId ||
+          (entry.kind === 'diary' && entry.sourceSessionId === sessionId),
+      );
+  return relevant
+    .slice(0, 16)
+    .map(
+      (entry) =>
+        `${entry.kind === 'diary' ? '日记' : entry.title || '记忆'}：${entry.content}`,
+    )
+    .join('\n');
 }
 
 async function compressIfNeeded({ sessionId, settings, messages, message }) {
@@ -67,7 +87,8 @@ export async function runChat({ sessionId, message, model = 'local' }) {
   let messages = await storage.listMessages(sessionId, true);
   messages = await compressIfNeeded({ sessionId, settings, messages, message });
   const memories = await storage.listMemories(10);
-  const context = buildFullPrompt({ settings, messages, memories, message });
+  const memoryLibraryText = await getMemoryLibraryText({ sessionId, settings });
+  const context = buildFullPrompt({ settings, messages, memories, memoryLibraryText, message });
 
   const result = await generateReply({
     model,
@@ -114,10 +135,12 @@ export async function regenerateReply({ sessionId, model = 'local' }) {
   const history = await storage.listMessages(sessionId, true);
   const userMessage = history[history.length - 1];
   const memories = await storage.listMemories(10);
+  const memoryLibraryText = await getMemoryLibraryText({ sessionId, settings });
   const context = buildFullPrompt({
     settings,
     messages: history,
     memories,
+    memoryLibraryText,
     message: userMessage.content,
   });
   const result = await generateReply({

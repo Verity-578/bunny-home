@@ -778,6 +778,7 @@ function SearchPanel({ onClose }) {
               <option value="all">聊天 + 记忆</option>
               <option value="messages">仅聊天</option>
               <option value="memories">仅记忆</option>
+              <option value="favorites">仅收藏</option>
             </select>
           </label>
           <button type="submit" className="save-button" disabled={!query.trim() || busy}>
@@ -789,7 +790,9 @@ function SearchPanel({ onClose }) {
 
         {results && (
           <div className="search-results">
-            {results.messages.length === 0 && results.memories.length === 0 && (
+            {results.messages.length === 0 &&
+              results.memories.length === 0 &&
+              results.favorites.length === 0 && (
               <div className="favorites-empty">没有找到相关内容</div>
             )}
             {results.messages.map((item) => (
@@ -810,6 +813,16 @@ function SearchPanel({ onClose }) {
                   <time>{formatTime(item.createdAt)}</time>
                 </div>
                 {item.title && <h3>{item.title}</h3>}
+                <p>{item.content}</p>
+              </article>
+            ))}
+            {results.favorites.map((item) => (
+              <article className="search-result" key={`f-${item.id}`}>
+                <div className="memory-meta">
+                  <Bookmark size={14} />
+                  <strong>收藏</strong>
+                  <time>{formatTime(item.createdAt)}</time>
+                </div>
                 <p>{item.content}</p>
               </article>
             ))}
@@ -930,6 +943,7 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
         proactiveQuietEnd: settings.proactiveQuietEnd || '08:00',
         memoryCollectionEnabled: Boolean(settings.memoryCollectionEnabled),
         memoryEveryMessages: settings.memoryEveryMessages ?? 8,
+        memorySharedAcrossSessions: Boolean(settings.memorySharedAcrossSessions),
       });
     }
   }, [settings]);
@@ -1098,6 +1112,17 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
                 type="checkbox"
                 checked={Boolean(form?.memoryCollectionEnabled)}
                 onChange={(event) => update('memoryCollectionEnabled', event.target.checked)}
+              />
+            </label>
+            <label className="toggle-row memory-share-row">
+              <span>
+                <strong>跨窗口共享记忆</strong>
+                <small>关闭后每个会话只使用自己的记忆</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={Boolean(form?.memorySharedAcrossSessions)}
+                onChange={(event) => update('memorySharedAcrossSessions', event.target.checked)}
               />
             </label>
             {form?.memoryCollectionEnabled && (

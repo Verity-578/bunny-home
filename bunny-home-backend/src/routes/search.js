@@ -37,6 +37,7 @@ router.get(
 
     const messages = [];
     const memories = [];
+    const favorites = [];
     const sessions = await storage.listSessions();
 
     if (scope === 'all' || scope === 'messages') {
@@ -68,9 +69,19 @@ router.get(
       }
     }
 
+    if (scope === 'all' || scope === 'favorites') {
+      const allFavorites = await storage.listFavorites();
+      for (const favorite of allFavorites) {
+        if (!favorite.content.toLowerCase().includes(query)) continue;
+        if (!matchesDate(favorite.createdAt, from, to)) continue;
+        favorites.push(favorite);
+      }
+    }
+
     res.json({
       messages: messages.slice(0, 100),
       memories: memories.slice(0, 100),
+      favorites: favorites.slice(0, 100),
     });
   }),
 );
