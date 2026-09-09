@@ -1078,11 +1078,13 @@ body {
 .from-user .bubble {
   color: #fbfeff;
   background: #3f8393;
+  padding: 12px 15px 9px;
 }
 
 .from-bunny .bubble {
   border-color: rgba(52, 143, 163, 0.2);
   background: #f4fbfc;
+  padding: 34px 44px 9px 15px;
 }
 
 .bubble time {

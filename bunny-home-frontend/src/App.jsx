@@ -56,7 +56,7 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [models, setModels] = useState([{ value: 'local', label: '本地演示', ready: true }]);
   const [settings, setSettings] = useState(null);
-  const [model, setModel] = useState('local');
+  const [model, setModel] = useState(() => localStorage.getItem('bunny_model') || 'local');
   const [draft, setDraft] = useState('');
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -105,10 +105,15 @@ export default function App() {
         setSettings(settingsData.settings);
         setFavorites(favoriteData.favorites || []);
         setActiveId((sessionData.sessions || [])[0]?.id || null);
-        const readyModel =
-          (modelData.models || []).find((option) => option.ready && option.value !== 'local') ||
-          (modelData.models || []).find((option) => option.ready);
-        setModel(readyModel?.value || 'local');
+        const storedModel = localStorage.getItem('bunny_model');
+        if (!storedModel) {
+          const readyModel =
+            (modelData.models || []).find((option) => option.ready && option.value !== 'local') ||
+            (modelData.models || []).find((option) => option.ready);
+          setModel(readyModel?.value || 'local');
+        } else {
+          setModel(storedModel);
+        }
         setConnectionError('');
       } catch (error) {
         if (!cancelled) setConnectionError(error.message);
@@ -168,6 +173,10 @@ export default function App() {
       settings?.themeColor || '#2e7d91',
     );
   }, [settings?.themeColor]);
+
+  useEffect(() => {
+    localStorage.setItem('bunny_model', model);
+  }, [model]);
 
   async function handleCreateSession() {
     try {
@@ -726,6 +735,12 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
       });
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (form?.themeColor) {
+      document.documentElement.style.setProperty('--accent', form.themeColor);
+    }
+  }, [form?.themeColor]);
 
   function update(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
