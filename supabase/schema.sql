@@ -51,6 +51,8 @@ create table public.settings (
   proactive_quiet_start text not null default '23:00',
   proactive_quiet_end text not null default '08:00',
   last_proactive_at timestamptz,
+  memory_collection_enabled boolean not null default true,
+  memory_every_messages integer not null default 8,
   updated_at timestamptz not null default now()
 );
 
@@ -94,3 +96,28 @@ alter table public.settings
 
 alter table public.settings
   add column if not exists last_proactive_at timestamptz;
+
+alter table public.settings
+  add column if not exists memory_collection_enabled boolean not null default true;
+
+alter table public.settings
+  add column if not exists memory_every_messages integer not null default 8;
+
+create table if not exists public.memory_entries (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null default 'memory' check (kind in ('memory', 'diary', 'preference', 'relationship')),
+  title text not null default '',
+  content text not null,
+  importance numeric(5,2) not null default 1,
+  tags jsonb not null default '[]'::jsonb,
+  source_session_id uuid references public.sessions(id) on delete set null,
+  diary_date text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_memory_entries_created
+  on public.memory_entries(created_at desc);
+
+create unique index if not exists idx_memory_entries_diary_date
+  on public.memory_entries(diary_date) where kind = 'diary' and diary_date is not null;

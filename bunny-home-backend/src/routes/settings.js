@@ -42,6 +42,9 @@ router.put(
     if (typeof input.proactiveEnabled === 'boolean') {
       patch.proactiveEnabled = input.proactiveEnabled;
     }
+    if (typeof input.memoryCollectionEnabled === 'boolean') {
+      patch.memoryCollectionEnabled = input.memoryCollectionEnabled;
+    }
 
     const numberFields = [
       'temperature',
@@ -52,6 +55,7 @@ router.put(
       'maxReplyTokens',
       'proactiveIntervalMinutes',
       'proactiveBatchCount',
+      'memoryEveryMessages',
     ];
     for (const field of numberFields) {
       if (input[field] === undefined) continue;

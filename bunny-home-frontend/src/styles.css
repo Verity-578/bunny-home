@@ -492,6 +492,35 @@ button {
   padding: 22px;
 }
 
+.settings-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(72, 116, 128, 0.08);
+}
+
+.settings-tabs button {
+  height: 34px;
+  border: 0;
+  border-radius: 6px;
+  color: #5f7c88;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-tabs button.is-active {
+  color: #fff;
+  background: var(--accent);
+}
+
+.memory-interval-field {
+  margin-top: 12px;
+}
+
 .field {
   flex-direction: column;
   gap: 8px;
@@ -992,6 +1021,67 @@ button {
   width: 30px;
   height: 30px;
   flex-basis: 30px;
+}
+
+.memory-list {
+  display: grid;
+  gap: 12px;
+  padding: 20px 22px 24px;
+}
+
+.memory-item {
+  padding: 15px 16px;
+  border: 1px solid rgba(72, 116, 128, 0.14);
+  border-radius: 8px;
+  background: #fbfefe;
+}
+
+.memory-item.kind-diary {
+  border-color: rgba(46, 125, 145, 0.2);
+  background: linear-gradient(160deg, #f4fbfc, #eef6f7);
+}
+
+.memory-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #78939d;
+  font-size: 11px;
+}
+
+.memory-meta strong {
+  color: #52717c;
+}
+
+.importance {
+  color: #a9604e;
+}
+
+.memory-item h3 {
+  margin: 9px 0 4px;
+  font-size: 15px;
+}
+
+.memory-item p {
+  margin: 0;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.memory-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.memory-tags span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #2e7d91;
+  background: rgba(46, 125, 145, 0.1);
+  font-size: 11px;
 }
 
 .home-button,

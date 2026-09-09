@@ -118,3 +118,14 @@ export function deleteFavorite(id) {
     method: 'DELETE',
   });
 }
+
+export function listMemoryEntries() {
+  return apiRequest('/api/memories');
+}
+
+export function addMemoryEntry(payload) {
+  return apiRequest('/api/memories', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

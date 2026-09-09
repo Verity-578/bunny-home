@@ -22,6 +22,8 @@ const DEFAULT_SETTINGS = {
   proactiveQuietStart: '23:00',
   proactiveQuietEnd: '08:00',
   lastProactiveAt: null,
+  memoryCollectionEnabled: true,
+  memoryEveryMessages: 8,
 };
 
 const SETTING_FIELDS = {
@@ -41,6 +43,8 @@ const SETTING_FIELDS = {
   proactiveQuietStart: 'proactive_quiet_start',
   proactiveQuietEnd: 'proactive_quiet_end',
   lastProactiveAt: 'last_proactive_at',
+  memoryCollectionEnabled: 'memory_collection_enabled',
+  memoryEveryMessages: 'memory_every_messages',
 };
 
 const sessionSelect = `
@@ -110,6 +114,8 @@ export class SqliteStore {
         proactive_quiet_start TEXT NOT NULL DEFAULT '23:00',
         proactive_quiet_end TEXT NOT NULL DEFAULT '08:00',
         last_proactive_at TEXT,
+        memory_collection_enabled INTEGER NOT NULL DEFAULT 1,
+        memory_every_messages INTEGER NOT NULL DEFAULT 8,
         updated_at TEXT NOT NULL
       );
 
@@ -125,6 +131,22 @@ export class SqliteStore {
         content TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS memory_entries (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL DEFAULT 'memory',
+        title TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL,
+        importance REAL NOT NULL DEFAULT 1,
+        tags TEXT NOT NULL DEFAULT '[]',
+        source_session_id TEXT,
+        diary_date TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_memory_entries_created
+        ON memory_entries(created_at DESC);
     `);
     this.ensureColumn('settings', 'theme_color', "TEXT NOT NULL DEFAULT '#2e7d91'");
     this.ensureColumn('settings', 'persona_prompt', 'TEXT');
@@ -135,6 +157,8 @@ export class SqliteStore {
     this.ensureColumn('settings', 'proactive_quiet_start', "TEXT NOT NULL DEFAULT '23:00'");
     this.ensureColumn('settings', 'proactive_quiet_end', "TEXT NOT NULL DEFAULT '08:00'");
     this.ensureColumn('settings', 'last_proactive_at', 'TEXT');
+    this.ensureColumn('settings', 'memory_collection_enabled', 'INTEGER NOT NULL DEFAULT 1');
+    this.ensureColumn('settings', 'memory_every_messages', 'INTEGER NOT NULL DEFAULT 8');
   }
 
   ensureColumn(table, column, definition) {
@@ -155,8 +179,9 @@ export class SqliteStore {
           max_context_tokens, compress_threshold, compress_keep_rounds,
           max_reply_tokens, theme_color, persona_prompt, language_style_prompt,
           proactive_enabled, proactive_interval_minutes, proactive_batch_count,
-          proactive_quiet_start, proactive_quiet_end, last_proactive_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          proactive_quiet_start, proactive_quiet_end, last_proactive_at,
+          memory_collection_enabled, memory_every_messages, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         1,
@@ -177,6 +202,8 @@ export class SqliteStore {
         DEFAULT_SETTINGS.proactiveQuietStart,
         DEFAULT_SETTINGS.proactiveQuietEnd,
         null,
+        DEFAULT_SETTINGS.memoryCollectionEnabled ? 1 : 0,
+        DEFAULT_SETTINGS.memoryEveryMessages,
         nowIso(),
       );
   }
@@ -330,6 +357,8 @@ export class SqliteStore {
           proactive_quiet_start AS proactiveQuietStart,
           proactive_quiet_end AS proactiveQuietEnd,
           last_proactive_at AS lastProactiveAt,
+          memory_collection_enabled AS memoryCollectionEnabled,
+          memory_every_messages AS memoryEveryMessages,
           updated_at AS updatedAt
         FROM settings
         WHERE id = 1
@@ -342,6 +371,8 @@ export class SqliteStore {
       personaPrompt: row.personaPrompt || row.systemPrompt || DEFAULT_SETTINGS.personaPrompt,
       languageStylePrompt: row.languageStylePrompt || DEFAULT_SETTINGS.languageStylePrompt,
       proactiveEnabled: Boolean(row.proactiveEnabled),
+      memoryCollectionEnabled: Boolean(row.memoryCollectionEnabled),
+      memoryEveryMessages: Number(row.memoryEveryMessages || 8),
     };
   }
 
@@ -352,7 +383,11 @@ export class SqliteStore {
     for (const [key, column] of Object.entries(SETTING_FIELDS)) {
       if (patch[key] === undefined) continue;
       assignments.push(`${column} = ?`);
-      values.push(key === 'proactiveEnabled' ? (patch[key] ? 1 : 0) : patch[key]);
+      values.push(
+        key === 'proactiveEnabled' || key === 'memoryCollectionEnabled'
+          ? (patch[key] ? 1 : 0)
+          : patch[key],
+      );
     }
 
     if (assignments.length === 0) return this.getSettings();
@@ -361,6 +396,97 @@ export class SqliteStore {
     values.push(nowIso());
     this.db.prepare(`UPDATE settings SET ${assignments.join(', ')} WHERE id = 1`).run(...values);
     return this.getSettings();
+  }
+
+  listMemoryEntries(limit = 100) {
+    return this.db
+      .prepare(`
+        SELECT id, kind, title, content, importance, tags, source_session_id AS sourceSessionId,
+          diary_date AS diaryDate, created_at AS createdAt, updated_at AS updatedAt
+        FROM memory_entries
+        ORDER BY created_at DESC
+        LIMIT ?
+      `)
+      .all(limit)
+      .map((row) => ({
+        ...row,
+        tags: JSON.parse(row.tags || '[]'),
+      }));
+  }
+
+  addMemoryEntry({
+    kind = 'memory',
+    title = '',
+    content,
+    importance = 1,
+    tags = [],
+    sourceSessionId = null,
+    diaryDate = null,
+  }) {
+    const id = randomUUID();
+    const now = nowIso();
+    this.db
+      .prepare(`
+        INSERT INTO memory_entries (
+          id, kind, title, content, importance, tags,
+          source_session_id, diary_date, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .run(
+        id,
+        kind,
+        title,
+        content,
+        importance,
+        JSON.stringify(tags || []),
+        sourceSessionId,
+        diaryDate,
+        now,
+        now,
+      );
+    return this.getMemoryEntry(id);
+  }
+
+  getMemoryEntry(id) {
+    const row = this.db
+      .prepare(`
+        SELECT id, kind, title, content, importance, tags, source_session_id AS sourceSessionId,
+          diary_date AS diaryDate, created_at AS createdAt, updated_at AS updatedAt
+        FROM memory_entries WHERE id = ?
+      `)
+      .get(id);
+    return row ? { ...row, tags: JSON.parse(row.tags || '[]') } : null;
+  }
+
+  updateMemoryEntry(id, patch) {
+    const sets = [];
+    const values = [];
+    for (const [key, column] of Object.entries({
+      title: 'title',
+      content: 'content',
+      importance: 'importance',
+      tags: 'tags',
+    })) {
+      if (patch[key] === undefined) continue;
+      sets.push(`${column} = ?`);
+      values.push(key === 'tags' ? JSON.stringify(patch[key] || []) : patch[key]);
+    }
+    if (!sets.length) return this.getMemoryEntry(id);
+    sets.push('updated_at = ?');
+    values.push(nowIso(), id);
+    this.db.prepare(`UPDATE memory_entries SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+    return this.getMemoryEntry(id);
+  }
+
+  findDiaryByDate(diaryDate) {
+    const row = this.db
+      .prepare(`
+        SELECT id, kind, title, content, importance, tags, source_session_id AS sourceSessionId,
+          diary_date AS diaryDate, created_at AS createdAt, updated_at AS updatedAt
+        FROM memory_entries WHERE kind = 'diary' AND diary_date = ?
+      `)
+      .get(diaryDate);
+    return row ? { ...row, tags: JSON.parse(row.tags || '[]') } : null;
   }
 
   listFavorites(sessionId = null) {

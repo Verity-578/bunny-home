@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowUp,
+  BookHeart,
   Bookmark,
   BookmarkCheck,
   Check,
@@ -25,6 +26,7 @@ import {
   getModels,
   getSettings,
   listFavorites,
+  listMemoryEntries,
   listMessages,
   listSessions,
   renameSession,
@@ -68,6 +70,8 @@ export default function App() {
   const [authState, setAuthState] = useState('loading');
   const [favorites, setFavorites] = useState([]);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [memoryEntries, setMemoryEntries] = useState([]);
+  const [memoryOpen, setMemoryOpen] = useState(false);
   const [nowLabel, setNowLabel] = useState('');
   const bottomRef = useRef(null);
 
@@ -93,17 +97,19 @@ export default function App() {
     let cancelled = false;
     async function boot() {
       try {
-        const [sessionData, modelData, settingsData, favoriteData] = await Promise.all([
+        const [sessionData, modelData, settingsData, favoriteData, memoryData] = await Promise.all([
           listSessions(),
           getModels(),
           getSettings(),
           listFavorites(),
+          listMemoryEntries(),
         ]);
         if (cancelled) return;
         setSessions(sessionData.sessions || []);
         setModels(modelData.models || []);
         setSettings(settingsData.settings);
         setFavorites(favoriteData.favorites || []);
+        setMemoryEntries(memoryData.entries || []);
         setActiveId((sessionData.sessions || [])[0]?.id || null);
         const storedModel = localStorage.getItem('bunny_model');
         if (!storedModel) {
@@ -316,6 +322,16 @@ export default function App() {
     }
   }
 
+  async function handleOpenMemory() {
+    setMemoryOpen(true);
+    try {
+      const data = await listMemoryEntries();
+      setMemoryEntries(data.entries || []);
+    } catch (error) {
+      setConnectionError(error.message);
+    }
+  }
+
   async function handleUnlock(password) {
     await verifyPassword(password);
     storePassword(password);
@@ -477,6 +493,15 @@ export default function App() {
             <button
               type="button"
               className="icon-button"
+              data-testid="open-memory"
+              title="记忆库"
+              onClick={handleOpenMemory}
+            >
+              <BookHeart size={19} />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
               data-testid="open-favorites"
               title="收藏"
               onClick={handleOpenFavorites}
@@ -612,6 +637,9 @@ export default function App() {
           }}
         />
       )}
+      {memoryOpen && (
+        <MemoryPanel entries={memoryEntries} onClose={() => setMemoryOpen(false)} />
+      )}
     </div>
   );
 }
@@ -675,6 +703,50 @@ function AuthGate({ state, onUnlock }) {
   );
 }
 
+function MemoryPanel({ entries, onClose }) {
+  return (
+    <div className="drawer-layer">
+      <div className="settings-panel" role="dialog" aria-modal="true" aria-label="记忆库">
+        <div className="drawer-header">
+          <div>
+            <h2>记忆库</h2>
+            <p>Bunny 记得的事，和她写下的日记</p>
+          </div>
+          <button type="button" className="icon-button" title="关闭" onClick={onClose}>
+            <X size={19} />
+          </button>
+        </div>
+
+        <div className="memory-list">
+          {entries.length === 0 ? (
+            <div className="favorites-empty">记忆还在慢慢生长</div>
+          ) : (
+            entries.map((entry) => (
+              <article className={`memory-item kind-${entry.kind || 'memory'}`} key={entry.id}>
+                <div className="memory-meta">
+                  <BookHeart size={15} />
+                  <strong>{entry.kind === 'diary' ? '日记' : '记忆'}</strong>
+                  {entry.importance > 1 && <span className="importance">重要 {entry.importance}</span>}
+                  <time>{formatTime(entry.createdAt)}</time>
+                </div>
+                {entry.title && <h3>{entry.title}</h3>}
+                <p>{entry.content}</p>
+                {Array.isArray(entry.tags) && entry.tags.length > 0 && (
+                  <div className="memory-tags">
+                    {entry.tags.map((tag) => (
+                      <span key={tag}>#{tag}</span>
+                    ))}
+                  </div>
+                )}
+              </article>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FavoritesPanel({ favorites, onClose, onDelete }) {
   return (
     <div className="drawer-layer">
@@ -720,6 +792,7 @@ function FavoritesPanel({ favorites, onClose, onDelete }) {
 function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave }) {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('system');
 
   useEffect(() => {
     if (settings) {
@@ -738,6 +811,8 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
         proactiveBatchCount: settings.proactiveBatchCount ?? 1,
         proactiveQuietStart: settings.proactiveQuietStart || '23:00',
         proactiveQuietEnd: settings.proactiveQuietEnd || '08:00',
+        memoryCollectionEnabled: Boolean(settings.memoryCollectionEnabled),
+        memoryEveryMessages: settings.memoryEveryMessages ?? 8,
       });
     }
   }, [settings]);
@@ -777,6 +852,25 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
         </div>
 
         <div className="settings-body">
+          <div className="settings-tabs">
+            <button
+              type="button"
+              className={activeTab === 'system' ? 'is-active' : ''}
+              onClick={() => setActiveTab('system')}
+            >
+              系统设置
+            </button>
+            <button
+              type="button"
+              className={activeTab === 'chat' ? 'is-active' : ''}
+              onClick={() => setActiveTab('chat')}
+            >
+              对话设置
+            </button>
+          </div>
+
+          {activeTab === 'system' && (
+            <>
           <label className="field">
             <span>当前模型</span>
             <select value={model} onChange={(event) => onModelChange(event.target.value)}>
@@ -814,7 +908,11 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
               rows={3}
             />
           </label>
+            </>
+          )}
 
+          {activeTab === 'chat' && (
+            <>
           <div className="proactive-card">
             <label className="toggle-row">
               <span>
@@ -870,6 +968,32 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
                   />
                 </label>
               </div>
+            )}
+          </div>
+
+          <div className="proactive-card">
+            <label className="toggle-row">
+              <span>
+                <strong>主动记忆收集</strong>
+                <small>聊天积累到一定轮数后自动整理记忆和日记</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={Boolean(form?.memoryCollectionEnabled)}
+                onChange={(event) => update('memoryCollectionEnabled', event.target.checked)}
+              />
+            </label>
+            {form?.memoryCollectionEnabled && (
+              <label className="field memory-interval-field">
+                <span>每多少条消息整理一次</span>
+                <input
+                  type="number"
+                  min="2"
+                  max="50"
+                  value={form?.memoryEveryMessages ?? 8}
+                  onChange={(event) => update('memoryEveryMessages', Number(event.target.value))}
+                />
+              </label>
             )}
           </div>
 
@@ -942,6 +1066,8 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
               />
             </label>
           </div>
+            </>
+          )}
         </div>
 
         <div className="drawer-footer">

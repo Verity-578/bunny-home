@@ -4,6 +4,7 @@ import { badRequest, notFound } from '../errors.js';
 import { generateReply, getModelDefinition } from '../providers/index.js';
 import { storage } from '../storage.js';
 import { compressMessages } from './compress.js';
+import { maybeCollectMemory } from './memoryCollector.js';
 
 function estimateTokens(text) {
   return Math.ceil((text || '').length / 4);
@@ -77,12 +78,18 @@ export async function runChat({ sessionId, message, model = 'local' }) {
     settings,
   });
 
-  return await storage.addMessage({
+  const assistantMessage = await storage.addMessage({
     sessionId,
     role: 'assistant',
     content: result.content,
     reasoningContent: result.reasoningContent,
   });
+  if (settings.memoryCollectionEnabled) {
+    setTimeout(() => {
+      maybeCollectMemory({ sessionId }).catch((error) => console.error('memory collect', error));
+    }, 0);
+  }
+  return assistantMessage;
 }
 
 export function createEmptySessionId() {

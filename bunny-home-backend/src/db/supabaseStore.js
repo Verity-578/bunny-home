@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS = {
   proactiveQuietStart: '23:00',
   proactiveQuietEnd: '08:00',
   lastProactiveAt: null,
+  memoryCollectionEnabled: true,
+  memoryEveryMessages: 8,
 };
 
 const SETTING_COLUMNS = {
@@ -42,6 +44,8 @@ const SETTING_COLUMNS = {
   proactiveQuietStart: 'proactive_quiet_start',
   proactiveQuietEnd: 'proactive_quiet_end',
   lastProactiveAt: 'last_proactive_at',
+  memoryCollectionEnabled: 'memory_collection_enabled',
+  memoryEveryMessages: 'memory_every_messages',
 };
 
 function mapSession(row) {
@@ -79,6 +83,22 @@ function mapMemory(row) {
   };
 }
 
+function mapMemoryEntry(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    kind: row.kind,
+    title: row.title,
+    content: row.content,
+    importance: Number(row.importance),
+    tags: row.tags || [],
+    sourceSessionId: row.source_session_id,
+    diaryDate: row.diary_date,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function mapSettings(row) {
   if (!row) return null;
   return {
@@ -101,6 +121,8 @@ function mapSettings(row) {
     proactiveQuietStart: row.proactive_quiet_start || '23:00',
     proactiveQuietEnd: row.proactive_quiet_end || '08:00',
     lastProactiveAt: row.last_proactive_at,
+    memoryCollectionEnabled: Boolean(row.memory_collection_enabled),
+    memoryEveryMessages: Number(row.memory_every_messages || 8),
     updatedAt: row.updated_at,
   };
 }
@@ -291,6 +313,8 @@ export class SupabaseStore {
         proactive_quiet_start: DEFAULT_SETTINGS.proactiveQuietStart,
         proactive_quiet_end: DEFAULT_SETTINGS.proactiveQuietEnd,
         last_proactive_at: null,
+        memory_collection_enabled: DEFAULT_SETTINGS.memoryCollectionEnabled,
+        memory_every_messages: DEFAULT_SETTINGS.memoryEveryMessages,
         updated_at: nowIso(),
       })
       .select()
@@ -314,6 +338,73 @@ export class SupabaseStore {
       .maybeSingle();
     if (error) throw databaseError(error);
     return data ? mapSettings(data) : this.getSettings();
+  }
+
+  async listMemoryEntries(limit = 100) {
+    const { data, error } = await this.supabase
+      .from('memory_entries')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw databaseError(error);
+    return (data || []).map(mapMemoryEntry);
+  }
+
+  async addMemoryEntry({
+    kind = 'memory',
+    title = '',
+    content,
+    importance = 1,
+    tags = [],
+    sourceSessionId = null,
+    diaryDate = null,
+  }) {
+    const { data, error } = await this.supabase
+      .from('memory_entries')
+      .insert({
+        id: randomUUID(),
+        kind,
+        title,
+        content,
+        importance,
+        tags,
+        source_session_id: sourceSessionId,
+        diary_date: diaryDate,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      })
+      .select()
+      .single();
+    if (error) throw databaseError(error);
+    return mapMemoryEntry(data);
+  }
+
+  async updateMemoryEntry(id, patch) {
+    const values = {};
+    if (patch.title !== undefined) values.title = patch.title;
+    if (patch.content !== undefined) values.content = patch.content;
+    if (patch.importance !== undefined) values.importance = patch.importance;
+    if (patch.tags !== undefined) values.tags = patch.tags;
+    values.updated_at = nowIso();
+    const { data, error } = await this.supabase
+      .from('memory_entries')
+      .update(values)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw databaseError(error);
+    return mapMemoryEntry(data);
+  }
+
+  async findDiaryByDate(diaryDate) {
+    const { data, error } = await this.supabase
+      .from('memory_entries')
+      .select('*')
+      .eq('kind', 'diary')
+      .eq('diary_date', diaryDate)
+      .maybeSingle();
+    if (error) throw databaseError(error);
+    return data ? mapMemoryEntry(data) : null;
   }
 
   async listFavorites(sessionId = null) {
