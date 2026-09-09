@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Search,
   Settings2,
   Sparkles,
   Trash2,
@@ -31,6 +32,7 @@ import {
   listSessions,
   renameSession,
   regenerateMessage,
+  searchContent,
   sendMessage,
   storePassword,
   updateSettings,
@@ -72,6 +74,7 @@ export default function App() {
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [memoryEntries, setMemoryEntries] = useState([]);
   const [memoryOpen, setMemoryOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [nowLabel, setNowLabel] = useState('');
   const bottomRef = useRef(null);
 
@@ -332,6 +335,10 @@ export default function App() {
     }
   }
 
+  async function handleOpenSearch() {
+    setSearchOpen(true);
+  }
+
   async function handleUnlock(password) {
     await verifyPassword(password);
     storePassword(password);
@@ -493,6 +500,15 @@ export default function App() {
             <button
               type="button"
               className="icon-button"
+              data-testid="open-search"
+              title="搜索"
+              onClick={handleOpenSearch}
+            >
+              <Search size={19} />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
               data-testid="open-memory"
               title="记忆库"
               onClick={handleOpenMemory}
@@ -640,6 +656,7 @@ export default function App() {
       {memoryOpen && (
         <MemoryPanel entries={memoryEntries} onClose={() => setMemoryOpen(false)} />
       )}
+      {searchOpen && <SearchPanel onClose={() => setSearchOpen(false)} />}
     </div>
   );
 }
@@ -700,6 +717,106 @@ function AuthGate({ state, onUnlock }) {
         {error && <p className="auth-error">{error}</p>}
       </div>
     </main>
+  );
+}
+
+function SearchPanel({ onClose }) {
+  const [query, setQuery] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [scope, setScope] = useState('all');
+  const [results, setResults] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!query.trim() || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const data = await searchContent({ query: query.trim(), scope, from, to });
+      setResults(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="drawer-layer">
+      <div className="settings-panel" role="dialog" aria-modal="true" aria-label="搜索">
+        <div className="drawer-header">
+          <div>
+            <h2>搜索</h2>
+            <p>找回说过的话和记得的事</p>
+          </div>
+          <button type="button" className="icon-button" title="关闭" onClick={onClose}>
+            <X size={19} />
+          </button>
+        </div>
+
+        <form className="search-body" onSubmit={handleSubmit}>
+          <label className="field">
+            <span>关键词</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} autoFocus />
+          </label>
+          <div className="range-row">
+            <label className="field">
+              <span>从</span>
+              <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>到</span>
+              <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+            </label>
+          </div>
+          <label className="field">
+            <span>范围</span>
+            <select value={scope} onChange={(event) => setScope(event.target.value)}>
+              <option value="all">聊天 + 记忆</option>
+              <option value="messages">仅聊天</option>
+              <option value="memories">仅记忆</option>
+            </select>
+          </label>
+          <button type="submit" className="save-button" disabled={!query.trim() || busy}>
+            {busy ? '搜索中…' : '搜索'}
+          </button>
+        </form>
+
+        {error && <div className="auth-error search-error">{error}</div>}
+
+        {results && (
+          <div className="search-results">
+            {results.messages.length === 0 && results.memories.length === 0 && (
+              <div className="favorites-empty">没有找到相关内容</div>
+            )}
+            {results.messages.map((item) => (
+              <article className="search-result" key={`m-${item.id}`}>
+                <div className="memory-meta">
+                  <strong>{item.sessionName || '对话'}</strong>
+                  <span>{item.role === 'user' ? '用户' : 'Bunny'}</span>
+                  <time>{formatTime(item.createdAt)}</time>
+                </div>
+                <p>{item.content}</p>
+              </article>
+            ))}
+            {results.memories.map((item) => (
+              <article className={`search-result kind-${item.kind || 'memory'}`} key={`r-${item.id}`}>
+                <div className="memory-meta">
+                  <BookHeart size={14} />
+                  <strong>{item.kind === 'diary' ? '日记' : '记忆'}</strong>
+                  <time>{formatTime(item.createdAt)}</time>
+                </div>
+                {item.title && <h3>{item.title}</h3>}
+                <p>{item.content}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

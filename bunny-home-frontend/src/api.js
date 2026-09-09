@@ -129,3 +129,10 @@ export function addMemoryEntry(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function searchContent({ query, scope = 'all', from = '', to = '' }) {
+  const params = new URLSearchParams({ q: query, scope });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return apiRequest(`/api/search?${params.toString()}`);
+}

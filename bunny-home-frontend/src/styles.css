@@ -1084,6 +1084,41 @@ button {
   font-size: 11px;
 }
 
+.search-body {
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px 14px;
+}
+
+.search-error {
+  padding: 0 22px;
+}
+
+.search-results {
+  display: grid;
+  gap: 12px;
+  padding: 6px 22px 24px;
+}
+
+.search-result {
+  padding: 13px 14px;
+  border: 1px solid rgba(72, 116, 128, 0.14);
+  border-radius: 8px;
+  background: #fbfefe;
+}
+
+.search-result h3 {
+  margin: 8px 0 4px;
+  font-size: 15px;
+}
+
+.search-result p {
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .home-button,
 .new-chat-button,
 .send-button,

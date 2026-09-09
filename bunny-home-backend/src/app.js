@@ -14,6 +14,7 @@ import modelsRouter from './routes/models.js';
 import memoryEntriesRouter from './routes/memoryEntries.js';
 import sessionsRouter from './routes/sessions.js';
 import settingsRouter from './routes/settings.js';
+import searchRouter from './routes/search.js';
 
 function findFrontendDist() {
   const candidates = [
@@ -45,6 +46,7 @@ export function createApp() {
   app.use('/api/models', modelsRouter);
   app.use('/api/favorites', favoritesRouter);
   app.use('/api/memories', memoryEntriesRouter);
+  app.use('/api/search', searchRouter);
 
   if (frontendDist) {
     app.use(express.static(frontendDist));
