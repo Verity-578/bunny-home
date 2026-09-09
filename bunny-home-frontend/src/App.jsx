@@ -9,6 +9,7 @@ import {
   Menu,
   Pencil,
   Plus,
+  RefreshCw,
   Settings2,
   Sparkles,
   Trash2,
@@ -27,6 +28,7 @@ import {
   listMessages,
   listSessions,
   renameSession,
+  regenerateMessage,
   sendMessage,
   storePassword,
   updateSettings,
@@ -66,6 +68,7 @@ export default function App() {
   const [authState, setAuthState] = useState('loading');
   const [favorites, setFavorites] = useState([]);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [nowLabel, setNowLabel] = useState('');
   const bottomRef = useRef(null);
 
   const activeSession = sessions.find((session) => session.id === activeId) || null;
@@ -145,6 +148,27 @@ export default function App() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages.length, isSending]);
 
+  useEffect(() => {
+    const update = () =>
+      setNowLabel(
+        new Date().toLocaleString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }),
+      );
+    update();
+    const timer = setInterval(update, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--accent',
+      settings?.themeColor || '#2e7d91',
+    );
+  }, [settings?.themeColor]);
+
   async function handleCreateSession() {
     try {
       const data = await createSession();
@@ -219,6 +243,24 @@ export default function App() {
           createdAt: new Date().toISOString(),
         },
       ]);
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  async function handleRegenerate(message) {
+    if (!activeSession || isSending) return;
+    setIsSending(true);
+    try {
+      const data = await regenerateMessage({
+        sessionId: activeSession.id,
+        model,
+      });
+      setMessages((current) =>
+        current.map((item) => (item.id === message.id ? data.message : item)),
+      );
+    } catch (error) {
+      setConnectionError(error.message);
     } finally {
       setIsSending(false);
     }
@@ -374,7 +416,7 @@ export default function App() {
                 ) : (
                   <div className="session-title-block">
                     <h1>{activeSession.name}</h1>
-                    <p>和 Bunny 说话</p>
+                    <p>和 Bunny 说话 · {nowLabel}</p>
                   </div>
                 )}
 
@@ -457,12 +499,24 @@ export default function App() {
               </div>
             )}
 
-            {messages.map((message) => (
+            {messages.map((message, messageIndex) => (
               <article
                 key={message.id}
                 className={`message-row ${message.role === 'assistant' ? 'from-bunny' : 'from-user'}`}
               >
                 <div className="bubble">
+                  {message.role === 'assistant' &&
+                    !isSending &&
+                    messageIndex === messages.length - 1 && (
+                      <button
+                        type="button"
+                        className="regenerate-toggle"
+                        title="重新生成"
+                        onClick={() => handleRegenerate(message)}
+                      >
+                        <RefreshCw size={14} />
+                      </button>
+                    )}
                   <button
                     type="button"
                     className={`favorite-toggle ${
@@ -532,6 +586,9 @@ export default function App() {
       {settingsOpen && (
         <SettingsPanel
           settings={settings}
+          models={models}
+          model={model}
+          onModelChange={setModel}
           onClose={() => setSettingsOpen(false)}
           onSave={handleSaveSettings}
         />
@@ -651,7 +708,7 @@ function FavoritesPanel({ favorites, onClose, onDelete }) {
   );
 }
 
-function SettingsPanel({ settings, onClose, onSave }) {
+function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave }) {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -699,6 +756,17 @@ function SettingsPanel({ settings, onClose, onSave }) {
         </div>
 
         <div className="settings-body">
+          <label className="field">
+            <span>当前模型</span>
+            <select value={model} onChange={(event) => onModelChange(event.target.value)}>
+              {models.map((option) => (
+                <option key={option.value} value={option.value} disabled={!option.ready}>
+                  {option.ready ? option.label : `${option.label}（未配置）`}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <label className="field">
             <span>主题颜色</span>
             <input

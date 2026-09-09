@@ -203,6 +203,12 @@ export class SupabaseStore {
     if (error) throw databaseError(error);
   }
 
+  async deleteMessage(id) {
+    const { error } = await this.supabase.from('messages').delete().eq('id', id);
+    if (error) throw databaseError(error);
+    return true;
+  }
+
   async listMemories(limit = 20) {
     const { data, error } = await this.supabase
       .from('memories')

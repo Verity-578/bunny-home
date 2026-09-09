@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { notFound } from '../errors.js';
+import { badRequest, notFound } from '../errors.js';
 import { generateReply, getModelDefinition } from '../providers/index.js';
 import { storage } from '../storage.js';
 import { compressMessages } from './compress.js';
@@ -20,6 +20,7 @@ export function buildFullPrompt({ settings, messages, memories, message }) {
     .join('\n');
 
   const sections = [systemPrompt];
+  sections.push(`当前时间：${new Date().toLocaleString('zh-CN', { hour12: false })}`);
   if (memoryText) sections.push(`【长期记忆】\n${memoryText}`);
   if (historyText) sections.push(`【当前对话】\n${historyText}`);
 
@@ -84,4 +85,44 @@ export async function runChat({ sessionId, message, model = 'local' }) {
 
 export function createEmptySessionId() {
   return randomUUID();
+}
+
+export async function regenerateReply({ sessionId, model = 'local' }) {
+  const session = await storage.getSession(sessionId);
+  if (!session) throw notFound('会话不存在');
+  if (!getModelDefinition(model)) throw notFound('未知模型');
+
+  const settings = await storage.getSettings();
+  const messages = await storage.listMessages(sessionId, true);
+  const lastAssistantIndex = [...messages].reverse().findIndex((item) => item.role === 'assistant');
+  if (lastAssistantIndex < 0) throw badRequest('nothing_to_regenerate', '没有可重新生成的消息');
+  const lastAssistant = messages[messages.length - 1 - lastAssistantIndex];
+  if (messages[messages.length - 1 - lastAssistantIndex - 1]?.role !== 'user') {
+    throw badRequest('nothing_to_regenerate', '没有可重新生成的上一条用户消息');
+  }
+
+  await storage.deleteMessage(lastAssistant.id);
+  const history = await storage.listMessages(sessionId, true);
+  const userMessage = history[history.length - 1];
+  const memories = await storage.listMemories(10);
+  const context = buildFullPrompt({
+    settings,
+    messages: history,
+    memories,
+    message: userMessage.content,
+  });
+  const result = await generateReply({
+    model,
+    message: userMessage.content,
+    fullPrompt: context.fullPrompt,
+    memoryText: context.memoryText,
+    historyText: context.historyText,
+    settings,
+  });
+  return storage.addMessage({
+    sessionId,
+    role: 'assistant',
+    content: result.content,
+    reasoningContent: result.reasoningContent,
+  });
 }

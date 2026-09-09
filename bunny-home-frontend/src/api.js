@@ -79,6 +79,13 @@ export function sendMessage({ sessionId, message, model }) {
   });
 }
 
+export function regenerateMessage({ sessionId, model }) {
+  return apiRequest(`/api/sessions/${sessionId}/regenerate`, {
+    method: 'POST',
+    body: JSON.stringify({ model }),
+  });
+}
+
 export function getSettings() {
   return apiRequest('/api/settings');
 }

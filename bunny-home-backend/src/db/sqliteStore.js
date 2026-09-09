@@ -235,6 +235,11 @@ export class SqliteStore {
     }
   }
 
+  deleteMessage(id) {
+    const result = this.db.prepare('DELETE FROM messages WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
   listMemories(limit = 20) {
     return this.db
       .prepare(`

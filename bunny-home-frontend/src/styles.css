@@ -503,7 +503,8 @@ button {
 }
 
 .field textarea,
-.field input {
+.field input,
+.field select {
   width: 100%;
   border: 1px solid rgba(105, 87, 74, 0.16);
   border-radius: 8px;
@@ -519,6 +520,11 @@ button {
 }
 
 .field input[type="number"] {
+  height: 42px;
+  padding: 0 12px;
+}
+
+.field select {
   height: 42px;
   padding: 0 12px;
 }
@@ -870,12 +876,31 @@ button {
   transition: opacity 140ms ease, background 140ms ease;
 }
 
+.regenerate-toggle {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: #8aa3ac;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease;
+}
+
 .bubble {
   position: relative;
 }
 
 .bubble:hover .favorite-toggle,
-.favorite-toggle.is-active {
+.favorite-toggle.is-active,
+.bubble:hover .regenerate-toggle {
   opacity: 1;
 }
 
@@ -949,6 +974,10 @@ button {
 .favorite-toggle.is-active {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+:root {
+  --accent: #2e7d91;
 }
 
 /* Soft blue-cyan eye-care theme */
@@ -1138,7 +1167,8 @@ body {
 }
 
 .field textarea,
-.field input {
+.field input,
+.field select {
   border-color: rgba(72, 116, 128, 0.18);
   color: #26333c;
   background: #fdfefe;

@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { badRequest, notFound } from '../errors.js';
-import { runChat } from '../services/chat.js';
+import { regenerateReply, runChat } from '../services/chat.js';
 import { storage } from '../storage.js';
 
 const router = Router();
@@ -28,6 +28,15 @@ router.post(
       model,
     });
     res.status(201).json({ message: assistantMessage });
+  }),
+);
+
+router.post(
+  '/:sessionId/regenerate',
+  asyncHandler(async (req, res) => {
+    const model = typeof req.body?.model === 'string' ? req.body.model : 'local';
+    const message = await regenerateReply({ sessionId: req.params.sessionId, model });
+    res.status(201).json({ message });
   }),
 );
 

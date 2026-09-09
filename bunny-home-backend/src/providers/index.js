@@ -17,6 +17,11 @@ export const modelCatalog = [
       : 'DeepSeek',
     ready: Boolean(process.env.DEEPSEEK_API_KEY),
   },
+  {
+    value: 'deepseek-reasoner',
+    label: 'DeepSeek 思考',
+    ready: Boolean(process.env.DEEPSEEK_API_KEY),
+  },
 ];
 
 export function getModelDefinition(value) {
@@ -56,6 +61,26 @@ export async function generateReply({ model, message, fullPrompt, memoryText, hi
         apiKey: process.env.DEEPSEEK_API_KEY,
         baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
         model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+      },
+    });
+  }
+
+  if (model === 'deepseek-reasoner') {
+    if (!definition.ready) {
+      throw new HttpError(
+        503,
+        'model_not_configured',
+        'DeepSeek 尚未配置，请先填写 DEEPSEEK_API_KEY。',
+      );
+    }
+    return openAiCompatibleReply({
+      message,
+      fullPrompt,
+      settings,
+      endpoint: {
+        apiKey: process.env.DEEPSEEK_API_KEY,
+        baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+        model: 'deepseek-reasoner',
       },
     });
   }
