@@ -724,7 +724,8 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
   useEffect(() => {
     if (settings) {
       setForm({
-        systemPrompt: settings.systemPrompt || '',
+        personaPrompt: settings.personaPrompt || settings.systemPrompt || '',
+        languageStylePrompt: settings.languageStylePrompt || '',
         temperature: settings.temperature ?? 0.7,
         maxContextRounds: settings.maxContextRounds ?? 20,
         maxContextTokens: settings.maxContextTokens ?? 8000,
@@ -732,6 +733,11 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
         compressKeepRounds: settings.compressKeepRounds ?? 10,
         maxReplyTokens: settings.maxReplyTokens ?? 2000,
         themeColor: settings.themeColor || '#2e7d91',
+        proactiveEnabled: Boolean(settings.proactiveEnabled),
+        proactiveIntervalMinutes: settings.proactiveIntervalMinutes ?? 180,
+        proactiveBatchCount: settings.proactiveBatchCount ?? 1,
+        proactiveQuietStart: settings.proactiveQuietStart || '23:00',
+        proactiveQuietEnd: settings.proactiveQuietEnd || '08:00',
       });
     }
   }, [settings]);
@@ -792,13 +798,80 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
           </label>
 
           <label className="field">
-            <span>系统提示词</span>
+            <span>人设设定</span>
             <textarea
-              value={form?.systemPrompt || ''}
-              onChange={(event) => update('systemPrompt', event.target.value)}
-              rows={5}
+              value={form?.personaPrompt || ''}
+              onChange={(event) => update('personaPrompt', event.target.value)}
+              rows={4}
             />
           </label>
+
+          <label className="field">
+            <span>语言风格</span>
+            <textarea
+              value={form?.languageStylePrompt || ''}
+              onChange={(event) => update('languageStylePrompt', event.target.value)}
+              rows={3}
+            />
+          </label>
+
+          <div className="proactive-card">
+            <label className="toggle-row">
+              <span>
+                <strong>主动发消息</strong>
+                <small>间隔到达时，Bunny 会主动来找你</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={Boolean(form?.proactiveEnabled)}
+                onChange={(event) => update('proactiveEnabled', event.target.checked)}
+              />
+            </label>
+            {form?.proactiveEnabled && (
+              <div className="proactive-fields">
+                <label className="field">
+                  <span>间隔分钟</span>
+                  <input
+                    type="number"
+                    min="10"
+                    step="10"
+                    value={form?.proactiveIntervalMinutes ?? 180}
+                    onChange={(event) =>
+                      update('proactiveIntervalMinutes', Number(event.target.value))
+                    }
+                  />
+                </label>
+                <label className="field">
+                  <span>每次条数</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={form?.proactiveBatchCount ?? 1}
+                    onChange={(event) =>
+                      update('proactiveBatchCount', Number(event.target.value))
+                    }
+                  />
+                </label>
+                <label className="field">
+                  <span>静默开始</span>
+                  <input
+                    type="time"
+                    value={form?.proactiveQuietStart || '23:00'}
+                    onChange={(event) => update('proactiveQuietStart', event.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>静默结束</span>
+                  <input
+                    type="time"
+                    value={form?.proactiveQuietEnd || '08:00'}
+                    onChange={(event) => update('proactiveQuietEnd', event.target.value)}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
 
           <div className="range-row">
             <label className="field">

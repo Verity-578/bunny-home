@@ -10,7 +10,8 @@ function estimateTokens(text) {
 }
 
 export function buildFullPrompt({ settings, messages, memories, message }) {
-  const systemPrompt = settings.systemPrompt || '';
+  const persona = settings.personaPrompt || settings.systemPrompt || '';
+  const languageStyle = settings.languageStylePrompt || '';
   const memoryText = (memories || [])
     .map((memory) => memory.summary)
     .filter(Boolean)
@@ -19,7 +20,8 @@ export function buildFullPrompt({ settings, messages, memories, message }) {
     .map((item) => `${item.role === 'user' ? '用户' : 'Bunny'}：${item.content}`)
     .join('\n');
 
-  const sections = [systemPrompt];
+  const sections = [persona];
+  if (languageStyle) sections.push(`【语言风格】\n${languageStyle}`);
   sections.push(`当前时间：${new Date().toLocaleString('zh-CN', { hour12: false })}`);
   if (memoryText) sections.push(`【长期记忆】\n${memoryText}`);
   if (historyText) sections.push(`【当前对话】\n${historyText}`);

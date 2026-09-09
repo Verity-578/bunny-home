@@ -43,6 +43,14 @@ create table public.settings (
   compress_keep_rounds integer not null default 10,
   max_reply_tokens integer not null default 2000,
   theme_color text not null default '#2e7d91',
+  persona_prompt text,
+  language_style_prompt text,
+  proactive_enabled boolean not null default false,
+  proactive_interval_minutes integer not null default 180,
+  proactive_batch_count integer not null default 1,
+  proactive_quiet_start text not null default '23:00',
+  proactive_quiet_end text not null default '08:00',
+  last_proactive_at timestamptz,
   updated_at timestamptz not null default now()
 );
 
@@ -62,3 +70,27 @@ create index if not exists idx_favorites_session
 
 alter table public.settings
   add column if not exists theme_color text not null default '#2e7d91';
+
+alter table public.settings
+  add column if not exists persona_prompt text;
+
+alter table public.settings
+  add column if not exists language_style_prompt text;
+
+alter table public.settings
+  add column if not exists proactive_enabled boolean not null default false;
+
+alter table public.settings
+  add column if not exists proactive_interval_minutes integer not null default 180;
+
+alter table public.settings
+  add column if not exists proactive_batch_count integer not null default 1;
+
+alter table public.settings
+  add column if not exists proactive_quiet_start text not null default '23:00';
+
+alter table public.settings
+  add column if not exists proactive_quiet_end text not null default '08:00';
+
+alter table public.settings
+  add column if not exists last_proactive_at timestamptz;

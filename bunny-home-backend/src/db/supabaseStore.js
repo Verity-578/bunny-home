@@ -15,6 +15,14 @@ const DEFAULT_SETTINGS = {
   compressKeepRounds: 10,
   maxReplyTokens: 2000,
   themeColor: '#2e7d91',
+  personaPrompt: '你是一个温暖、有画面感、懂得倾听的 AI 伴侣，名字叫 Bunny。',
+  languageStylePrompt: '说话温柔自然，多用短句，适当使用 emoji。',
+  proactiveEnabled: false,
+  proactiveIntervalMinutes: 180,
+  proactiveBatchCount: 1,
+  proactiveQuietStart: '23:00',
+  proactiveQuietEnd: '08:00',
+  lastProactiveAt: null,
 };
 
 const SETTING_COLUMNS = {
@@ -26,6 +34,14 @@ const SETTING_COLUMNS = {
   compressKeepRounds: 'compress_keep_rounds',
   maxReplyTokens: 'max_reply_tokens',
   themeColor: 'theme_color',
+  personaPrompt: 'persona_prompt',
+  languageStylePrompt: 'language_style_prompt',
+  proactiveEnabled: 'proactive_enabled',
+  proactiveIntervalMinutes: 'proactive_interval_minutes',
+  proactiveBatchCount: 'proactive_batch_count',
+  proactiveQuietStart: 'proactive_quiet_start',
+  proactiveQuietEnd: 'proactive_quiet_end',
+  lastProactiveAt: 'last_proactive_at',
 };
 
 function mapSession(row) {
@@ -76,6 +92,15 @@ function mapSettings(row) {
     compressKeepRounds: Number(row.compress_keep_rounds),
     maxReplyTokens: Number(row.max_reply_tokens),
     themeColor: row.theme_color || '#2e7d91',
+    personaPrompt: row.persona_prompt || row.system_prompt || DEFAULT_SETTINGS.personaPrompt,
+    languageStylePrompt:
+      row.language_style_prompt || DEFAULT_SETTINGS.languageStylePrompt,
+    proactiveEnabled: Boolean(row.proactive_enabled),
+    proactiveIntervalMinutes: Number(row.proactive_interval_minutes || 180),
+    proactiveBatchCount: Number(row.proactive_batch_count || 1),
+    proactiveQuietStart: row.proactive_quiet_start || '23:00',
+    proactiveQuietEnd: row.proactive_quiet_end || '08:00',
+    lastProactiveAt: row.last_proactive_at,
     updatedAt: row.updated_at,
   };
 }
@@ -258,6 +283,14 @@ export class SupabaseStore {
         compress_keep_rounds: DEFAULT_SETTINGS.compressKeepRounds,
         max_reply_tokens: DEFAULT_SETTINGS.maxReplyTokens,
         theme_color: DEFAULT_SETTINGS.themeColor,
+        persona_prompt: DEFAULT_SETTINGS.personaPrompt,
+        language_style_prompt: DEFAULT_SETTINGS.languageStylePrompt,
+        proactive_enabled: DEFAULT_SETTINGS.proactiveEnabled,
+        proactive_interval_minutes: DEFAULT_SETTINGS.proactiveIntervalMinutes,
+        proactive_batch_count: DEFAULT_SETTINGS.proactiveBatchCount,
+        proactive_quiet_start: DEFAULT_SETTINGS.proactiveQuietStart,
+        proactive_quiet_end: DEFAULT_SETTINGS.proactiveQuietEnd,
+        last_proactive_at: null,
         updated_at: nowIso(),
       })
       .select()

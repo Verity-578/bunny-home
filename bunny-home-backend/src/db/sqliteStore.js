@@ -14,6 +14,14 @@ const DEFAULT_SETTINGS = {
   compressKeepRounds: 10,
   maxReplyTokens: 2000,
   themeColor: '#2e7d91',
+  personaPrompt: '你是一个温暖、有画面感、懂得倾听的 AI 伴侣，名字叫 Bunny。',
+  languageStylePrompt: '说话温柔自然，多用短句，适当使用 emoji。',
+  proactiveEnabled: false,
+  proactiveIntervalMinutes: 180,
+  proactiveBatchCount: 1,
+  proactiveQuietStart: '23:00',
+  proactiveQuietEnd: '08:00',
+  lastProactiveAt: null,
 };
 
 const SETTING_FIELDS = {
@@ -25,6 +33,14 @@ const SETTING_FIELDS = {
   compressKeepRounds: 'compress_keep_rounds',
   maxReplyTokens: 'max_reply_tokens',
   themeColor: 'theme_color',
+  personaPrompt: 'persona_prompt',
+  languageStylePrompt: 'language_style_prompt',
+  proactiveEnabled: 'proactive_enabled',
+  proactiveIntervalMinutes: 'proactive_interval_minutes',
+  proactiveBatchCount: 'proactive_batch_count',
+  proactiveQuietStart: 'proactive_quiet_start',
+  proactiveQuietEnd: 'proactive_quiet_end',
+  lastProactiveAt: 'last_proactive_at',
 };
 
 const sessionSelect = `
@@ -86,6 +102,14 @@ export class SqliteStore {
         compress_keep_rounds INTEGER NOT NULL DEFAULT 10,
         max_reply_tokens INTEGER NOT NULL DEFAULT 2000,
         theme_color TEXT NOT NULL DEFAULT '#2e7d91',
+        persona_prompt TEXT,
+        language_style_prompt TEXT,
+        proactive_enabled INTEGER NOT NULL DEFAULT 0,
+        proactive_interval_minutes INTEGER NOT NULL DEFAULT 180,
+        proactive_batch_count INTEGER NOT NULL DEFAULT 1,
+        proactive_quiet_start TEXT NOT NULL DEFAULT '23:00',
+        proactive_quiet_end TEXT NOT NULL DEFAULT '08:00',
+        last_proactive_at TEXT,
         updated_at TEXT NOT NULL
       );
 
@@ -103,6 +127,14 @@ export class SqliteStore {
       );
     `);
     this.ensureColumn('settings', 'theme_color', "TEXT NOT NULL DEFAULT '#2e7d91'");
+    this.ensureColumn('settings', 'persona_prompt', 'TEXT');
+    this.ensureColumn('settings', 'language_style_prompt', 'TEXT');
+    this.ensureColumn('settings', 'proactive_enabled', 'INTEGER NOT NULL DEFAULT 0');
+    this.ensureColumn('settings', 'proactive_interval_minutes', 'INTEGER NOT NULL DEFAULT 180');
+    this.ensureColumn('settings', 'proactive_batch_count', 'INTEGER NOT NULL DEFAULT 1');
+    this.ensureColumn('settings', 'proactive_quiet_start', "TEXT NOT NULL DEFAULT '23:00'");
+    this.ensureColumn('settings', 'proactive_quiet_end', "TEXT NOT NULL DEFAULT '08:00'");
+    this.ensureColumn('settings', 'last_proactive_at', 'TEXT');
   }
 
   ensureColumn(table, column, definition) {
@@ -120,9 +152,11 @@ export class SqliteStore {
       .prepare(`
         INSERT INTO settings (
           id, session_id, system_prompt, temperature, max_context_rounds,
-        max_context_tokens, compress_threshold, compress_keep_rounds,
-        max_reply_tokens, theme_color, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          max_context_tokens, compress_threshold, compress_keep_rounds,
+          max_reply_tokens, theme_color, persona_prompt, language_style_prompt,
+          proactive_enabled, proactive_interval_minutes, proactive_batch_count,
+          proactive_quiet_start, proactive_quiet_end, last_proactive_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         1,
@@ -135,6 +169,14 @@ export class SqliteStore {
         DEFAULT_SETTINGS.compressKeepRounds,
         DEFAULT_SETTINGS.maxReplyTokens,
         DEFAULT_SETTINGS.themeColor,
+        DEFAULT_SETTINGS.personaPrompt,
+        DEFAULT_SETTINGS.languageStylePrompt,
+        DEFAULT_SETTINGS.proactiveEnabled ? 1 : 0,
+        DEFAULT_SETTINGS.proactiveIntervalMinutes,
+        DEFAULT_SETTINGS.proactiveBatchCount,
+        DEFAULT_SETTINGS.proactiveQuietStart,
+        DEFAULT_SETTINGS.proactiveQuietEnd,
+        null,
         nowIso(),
       );
   }
@@ -280,12 +322,27 @@ export class SqliteStore {
           compress_threshold AS compressThreshold,
           compress_keep_rounds AS compressKeepRounds,
           max_reply_tokens AS maxReplyTokens, theme_color AS themeColor,
+          persona_prompt AS personaPrompt,
+          language_style_prompt AS languageStylePrompt,
+          proactive_enabled AS proactiveEnabled,
+          proactive_interval_minutes AS proactiveIntervalMinutes,
+          proactive_batch_count AS proactiveBatchCount,
+          proactive_quiet_start AS proactiveQuietStart,
+          proactive_quiet_end AS proactiveQuietEnd,
+          last_proactive_at AS lastProactiveAt,
           updated_at AS updatedAt
         FROM settings
         WHERE id = 1
       `)
       .get();
-    return row ? { ...DEFAULT_SETTINGS, ...row } : { ...DEFAULT_SETTINGS };
+    if (!row) return { ...DEFAULT_SETTINGS };
+    return {
+      ...DEFAULT_SETTINGS,
+      ...row,
+      personaPrompt: row.personaPrompt || row.systemPrompt || DEFAULT_SETTINGS.personaPrompt,
+      languageStylePrompt: row.languageStylePrompt || DEFAULT_SETTINGS.languageStylePrompt,
+      proactiveEnabled: Boolean(row.proactiveEnabled),
+    };
   }
 
   updateSettings(patch) {
@@ -295,7 +352,7 @@ export class SqliteStore {
     for (const [key, column] of Object.entries(SETTING_FIELDS)) {
       if (patch[key] === undefined) continue;
       assignments.push(`${column} = ?`);
-      values.push(patch[key]);
+      values.push(key === 'proactiveEnabled' ? (patch[key] ? 1 : 0) : patch[key]);
     }
 
     if (assignments.length === 0) return this.getSettings();

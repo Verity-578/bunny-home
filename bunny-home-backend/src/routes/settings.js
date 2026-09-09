@@ -27,6 +27,22 @@ router.put(
       patch.themeColor = input.themeColor.trim();
     }
 
+    if (typeof input.personaPrompt === 'string') {
+      patch.personaPrompt = input.personaPrompt.trim();
+    }
+    if (typeof input.languageStylePrompt === 'string') {
+      patch.languageStylePrompt = input.languageStylePrompt.trim();
+    }
+    if (typeof input.proactiveQuietStart === 'string') {
+      patch.proactiveQuietStart = input.proactiveQuietStart.trim();
+    }
+    if (typeof input.proactiveQuietEnd === 'string') {
+      patch.proactiveQuietEnd = input.proactiveQuietEnd.trim();
+    }
+    if (typeof input.proactiveEnabled === 'boolean') {
+      patch.proactiveEnabled = input.proactiveEnabled;
+    }
+
     const numberFields = [
       'temperature',
       'maxContextRounds',
@@ -34,6 +50,8 @@ router.put(
       'compressThreshold',
       'compressKeepRounds',
       'maxReplyTokens',
+      'proactiveIntervalMinutes',
+      'proactiveBatchCount',
     ];
     for (const field of numberFields) {
       if (input[field] === undefined) continue;
