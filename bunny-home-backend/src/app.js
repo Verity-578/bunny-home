@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { HttpError } from './errors.js';
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
+import favoritesRouter from './routes/favorites.js';
 import messagesRouter from './routes/messages.js';
 import modelsRouter from './routes/models.js';
 import sessionsRouter from './routes/sessions.js';
@@ -41,6 +42,7 @@ export function createApp() {
   app.use('/api/sessions', messagesRouter);
   app.use('/api/settings', settingsRouter);
   app.use('/api/models', modelsRouter);
+  app.use('/api/favorites', favoritesRouter);
 
   if (frontendDist) {
     app.use(express.static(frontendDist));

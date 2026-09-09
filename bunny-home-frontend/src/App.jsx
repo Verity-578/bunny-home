@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowUp,
+  Bookmark,
+  BookmarkCheck,
   Check,
   House,
   LockKeyhole,
@@ -14,11 +16,14 @@ import {
 } from 'lucide-react';
 
 import {
+  addFavorite,
   createSession,
+  deleteFavorite,
   deleteSession,
   getAuthStatus,
   getModels,
   getSettings,
+  listFavorites,
   listMessages,
   listSessions,
   renameSession,
@@ -59,6 +64,8 @@ export default function App() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
   const [authState, setAuthState] = useState('loading');
+  const [favorites, setFavorites] = useState([]);
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
   const bottomRef = useRef(null);
 
   const activeSession = sessions.find((session) => session.id === activeId) || null;
@@ -83,15 +90,17 @@ export default function App() {
     let cancelled = false;
     async function boot() {
       try {
-        const [sessionData, modelData, settingsData] = await Promise.all([
+        const [sessionData, modelData, settingsData, favoriteData] = await Promise.all([
           listSessions(),
           getModels(),
           getSettings(),
+          listFavorites(),
         ]);
         if (cancelled) return;
         setSessions(sessionData.sessions || []);
         setModels(modelData.models || []);
         setSettings(settingsData.settings);
+        setFavorites(favoriteData.favorites || []);
         setActiveId((sessionData.sessions || [])[0]?.id || null);
         const readyModel =
           (modelData.models || []).find((option) => option.ready && option.value !== 'local') ||
@@ -226,6 +235,36 @@ export default function App() {
     }
   }
 
+  async function handleToggleFavorite(message) {
+    if (!activeSession) return;
+    const existing = favorites.find((favorite) => favorite.messageId === message.id);
+    try {
+      if (existing) {
+        await deleteFavorite(existing.id);
+        setFavorites((current) => current.filter((favorite) => favorite.id !== existing.id));
+      } else {
+        const data = await addFavorite({
+          sessionId: message.sessionId || activeSession.id,
+          messageId: message.id,
+          content: message.content,
+        });
+        setFavorites((current) => [data.favorite, ...current]);
+      }
+    } catch (error) {
+      setConnectionError(error.message);
+    }
+  }
+
+  async function handleOpenFavorites() {
+    setFavoritesOpen(true);
+    try {
+      const data = await listFavorites();
+      setFavorites(data.favorites || []);
+    } catch (error) {
+      setConnectionError(error.message);
+    }
+  }
+
   async function handleUnlock(password) {
     await verifyPassword(password);
     storePassword(password);
@@ -237,7 +276,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" style={{ '--accent': settings?.themeColor || '#2e7d91' }}>
       <div className={`scrim ${sidebarOpen ? 'is-visible' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}>
@@ -387,6 +426,15 @@ export default function App() {
             <button
               type="button"
               className="icon-button"
+              data-testid="open-favorites"
+              title="收藏"
+              onClick={handleOpenFavorites}
+            >
+              <Bookmark size={19} />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
               data-testid="open-settings"
               title="设置"
               onClick={() => setSettingsOpen(true)}
@@ -415,7 +463,27 @@ export default function App() {
                 className={`message-row ${message.role === 'assistant' ? 'from-bunny' : 'from-user'}`}
               >
                 <div className="bubble">
+                  <button
+                    type="button"
+                    className={`favorite-toggle ${
+                      favorites.some((favorite) => favorite.messageId === message.id) ? 'is-active' : ''
+                    }`}
+                    title="收藏这条消息"
+                    onClick={() => handleToggleFavorite(message)}
+                  >
+                    {favorites.some((favorite) => favorite.messageId === message.id) ? (
+                      <BookmarkCheck size={16} />
+                    ) : (
+                      <Bookmark size={16} />
+                    )}
+                  </button>
                   <p>{message.content}</p>
+                  {message.reasoningContent && (
+                    <details className="reasoning">
+                      <summary>思考过程</summary>
+                      <p>{message.reasoningContent}</p>
+                    </details>
+                  )}
                   <time>{formatTime(message.createdAt)}</time>
                 </div>
               </article>
@@ -466,6 +534,16 @@ export default function App() {
           settings={settings}
           onClose={() => setSettingsOpen(false)}
           onSave={handleSaveSettings}
+        />
+      )}
+      {favoritesOpen && (
+        <FavoritesPanel
+          favorites={favorites}
+          onClose={() => setFavoritesOpen(false)}
+          onDelete={async (id) => {
+            await deleteFavorite(id);
+            setFavorites((current) => current.filter((favorite) => favorite.id !== id));
+          }}
         />
       )}
     </div>
@@ -531,6 +609,48 @@ function AuthGate({ state, onUnlock }) {
   );
 }
 
+function FavoritesPanel({ favorites, onClose, onDelete }) {
+  return (
+    <div className="drawer-layer">
+      <div className="settings-panel" role="dialog" aria-modal="true" aria-label="收藏">
+        <div className="drawer-header">
+          <div>
+            <h2>收藏</h2>
+            <p>保留住想记住的话</p>
+          </div>
+          <button type="button" className="icon-button" title="关闭" onClick={onClose}>
+            <X size={19} />
+          </button>
+        </div>
+
+        <div className="favorites-list">
+          {favorites.length === 0 ? (
+            <div className="favorites-empty">还没有收藏</div>
+          ) : (
+            favorites.map((favorite) => (
+              <article className="favorite-item" key={favorite.id}>
+                <div className="favorite-meta">
+                  <Bookmark size={15} />
+                  <time>{formatTime(favorite.createdAt)}</time>
+                </div>
+                <p>{favorite.content}</p>
+                <button
+                  type="button"
+                  className="icon-button danger-button"
+                  title="删除收藏"
+                  onClick={() => onDelete(favorite.id)}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </article>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SettingsPanel({ settings, onClose, onSave }) {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -545,6 +665,7 @@ function SettingsPanel({ settings, onClose, onSave }) {
         compressThreshold: settings.compressThreshold ?? 12000,
         compressKeepRounds: settings.compressKeepRounds ?? 10,
         maxReplyTokens: settings.maxReplyTokens ?? 2000,
+        themeColor: settings.themeColor || '#2e7d91',
       });
     }
   }, [settings]);
@@ -578,6 +699,15 @@ function SettingsPanel({ settings, onClose, onSave }) {
         </div>
 
         <div className="settings-body">
+          <label className="field">
+            <span>主题颜色</span>
+            <input
+              type="color"
+              value={form?.themeColor || '#2e7d91'}
+              onChange={(event) => update('themeColor', event.target.value)}
+            />
+          </label>
+
           <label className="field">
             <span>系统提示词</span>
             <textarea

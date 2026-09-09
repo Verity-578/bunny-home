@@ -42,8 +42,23 @@ create table public.settings (
   compress_threshold integer not null default 12000,
   compress_keep_rounds integer not null default 10,
   max_reply_tokens integer not null default 2000,
+  theme_color text not null default '#2e7d91',
   updated_at timestamptz not null default now()
 );
 
 insert into public.settings (id) values (1)
 on conflict (id) do nothing;
+
+create table if not exists public.favorites (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  message_id uuid not null references public.messages(id) on delete cascade,
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_favorites_session
+  on public.favorites(session_id, created_at);
+
+alter table public.settings
+  add column if not exists theme_color text not null default '#2e7d91';

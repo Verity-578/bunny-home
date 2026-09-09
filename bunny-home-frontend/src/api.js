@@ -93,3 +93,21 @@ export function updateSettings(settings) {
 export function getModels() {
   return apiRequest('/api/models');
 }
+
+export function listFavorites(sessionId = null) {
+  const query = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : '';
+  return apiRequest(`/api/favorites${query}`);
+}
+
+export function addFavorite({ sessionId, messageId, content }) {
+  return apiRequest('/api/favorites', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId, messageId, content }),
+  });
+}
+
+export function deleteFavorite(id) {
+  return apiRequest(`/api/favorites/${id}`, {
+    method: 'DELETE',
+  });
+}

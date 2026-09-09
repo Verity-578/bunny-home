@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   compressThreshold: 12000,
   compressKeepRounds: 10,
   maxReplyTokens: 2000,
+  themeColor: '#2e7d91',
 };
 
 const SETTING_FIELDS = {
@@ -23,6 +24,7 @@ const SETTING_FIELDS = {
   compressThreshold: 'compress_threshold',
   compressKeepRounds: 'compress_keep_rounds',
   maxReplyTokens: 'max_reply_tokens',
+  themeColor: 'theme_color',
 };
 
 const sessionSelect = `
@@ -83,6 +85,7 @@ export class SqliteStore {
         compress_threshold INTEGER NOT NULL DEFAULT 12000,
         compress_keep_rounds INTEGER NOT NULL DEFAULT 10,
         max_reply_tokens INTEGER NOT NULL DEFAULT 2000,
+        theme_color TEXT NOT NULL DEFAULT '#2e7d91',
         updated_at TEXT NOT NULL
       );
 
@@ -90,7 +93,23 @@ export class SqliteStore {
         key TEXT PRIMARY KEY,
         value TEXT
       );
+
+      CREATE TABLE IF NOT EXISTS favorites (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
     `);
+    this.ensureColumn('settings', 'theme_color', "TEXT NOT NULL DEFAULT '#2e7d91'");
+  }
+
+  ensureColumn(table, column, definition) {
+    const columns = this.db.prepare(`PRAGMA table_info(${table})`).all();
+    if (!columns.some((item) => item.name === column)) {
+      this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
   }
 
   seedSettings() {
@@ -101,9 +120,9 @@ export class SqliteStore {
       .prepare(`
         INSERT INTO settings (
           id, session_id, system_prompt, temperature, max_context_rounds,
-          max_context_tokens, compress_threshold, compress_keep_rounds,
-          max_reply_tokens, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        max_context_tokens, compress_threshold, compress_keep_rounds,
+        max_reply_tokens, theme_color, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         1,
@@ -115,6 +134,7 @@ export class SqliteStore {
         DEFAULT_SETTINGS.compressThreshold,
         DEFAULT_SETTINGS.compressKeepRounds,
         DEFAULT_SETTINGS.maxReplyTokens,
+        DEFAULT_SETTINGS.themeColor,
         nowIso(),
       );
   }
@@ -254,7 +274,8 @@ export class SqliteStore {
           max_context_tokens AS maxContextTokens,
           compress_threshold AS compressThreshold,
           compress_keep_rounds AS compressKeepRounds,
-          max_reply_tokens AS maxReplyTokens, updated_at AS updatedAt
+          max_reply_tokens AS maxReplyTokens, theme_color AS themeColor,
+          updated_at AS updatedAt
         FROM settings
         WHERE id = 1
       `)
@@ -278,5 +299,41 @@ export class SqliteStore {
     values.push(nowIso());
     this.db.prepare(`UPDATE settings SET ${assignments.join(', ')} WHERE id = 1`).run(...values);
     return this.getSettings();
+  }
+
+  listFavorites(sessionId = null) {
+    const sql = sessionId
+      ? `
+        SELECT id, session_id AS sessionId, message_id AS messageId, content, created_at AS createdAt
+        FROM favorites WHERE session_id = ? ORDER BY created_at DESC
+      `
+      : `
+        SELECT id, session_id AS sessionId, message_id AS messageId, content, created_at AS createdAt
+        FROM favorites ORDER BY created_at DESC
+      `;
+    return this.db.prepare(sql).all(...(sessionId ? [sessionId] : []));
+  }
+
+  addFavorite({ sessionId, messageId, content }) {
+    const id = randomUUID();
+    const createdAt = nowIso();
+    this.db
+      .prepare(`
+        INSERT INTO favorites (id, session_id, message_id, content, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `)
+      .run(id, sessionId, messageId, content, createdAt);
+    return {
+      id,
+      sessionId,
+      messageId,
+      content,
+      createdAt,
+    };
+  }
+
+  deleteFavorite(id) {
+    const result = this.db.prepare('DELETE FROM favorites WHERE id = ?').run(id);
+    return result.changes > 0;
   }
 }

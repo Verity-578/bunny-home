@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   compressThreshold: 12000,
   compressKeepRounds: 10,
   maxReplyTokens: 2000,
+  themeColor: '#2e7d91',
 };
 
 const SETTING_COLUMNS = {
@@ -24,6 +25,7 @@ const SETTING_COLUMNS = {
   compressThreshold: 'compress_threshold',
   compressKeepRounds: 'compress_keep_rounds',
   maxReplyTokens: 'max_reply_tokens',
+  themeColor: 'theme_color',
 };
 
 function mapSession(row) {
@@ -73,6 +75,7 @@ function mapSettings(row) {
     compressThreshold: Number(row.compress_threshold),
     compressKeepRounds: Number(row.compress_keep_rounds),
     maxReplyTokens: Number(row.max_reply_tokens),
+    themeColor: row.theme_color || '#2e7d91',
     updatedAt: row.updated_at,
   };
 }
@@ -248,6 +251,7 @@ export class SupabaseStore {
         compress_threshold: DEFAULT_SETTINGS.compressThreshold,
         compress_keep_rounds: DEFAULT_SETTINGS.compressKeepRounds,
         max_reply_tokens: DEFAULT_SETTINGS.maxReplyTokens,
+        theme_color: DEFAULT_SETTINGS.themeColor,
         updated_at: nowIso(),
       })
       .select()
@@ -271,5 +275,49 @@ export class SupabaseStore {
       .maybeSingle();
     if (error) throw databaseError(error);
     return data ? mapSettings(data) : this.getSettings();
+  }
+
+  async listFavorites(sessionId = null) {
+    let query = this.supabase
+      .from('favorites')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (sessionId) query = query.eq('session_id', sessionId);
+    const { data, error } = await query;
+    if (error) throw databaseError(error);
+    return (data || []).map((row) => ({
+      id: row.id,
+      sessionId: row.session_id,
+      messageId: row.message_id,
+      content: row.content,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async addFavorite({ sessionId, messageId, content }) {
+    const { data, error } = await this.supabase
+      .from('favorites')
+      .insert({
+        session_id: sessionId,
+        message_id: messageId,
+        content,
+        created_at: nowIso(),
+      })
+      .select()
+      .single();
+    if (error) throw databaseError(error);
+    return {
+      id: data.id,
+      sessionId: data.session_id,
+      messageId: data.message_id,
+      content: data.content,
+      createdAt: data.created_at,
+    };
+  }
+
+  async deleteFavorite(id) {
+    const { error } = await this.supabase.from('favorites').delete().eq('id', id);
+    if (error) throw databaseError(error);
+    return true;
   }
 }

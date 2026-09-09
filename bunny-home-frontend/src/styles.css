@@ -852,6 +852,105 @@ button {
   font-weight: 600;
 }
 
+.favorite-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: #8aa3ac;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease;
+}
+
+.bubble {
+  position: relative;
+}
+
+.bubble:hover .favorite-toggle,
+.favorite-toggle.is-active {
+  opacity: 1;
+}
+
+.favorite-toggle.is-active {
+  color: #2e7d91;
+  background: rgba(46, 125, 145, 0.1);
+}
+
+.favorites-list {
+  display: grid;
+  gap: 12px;
+  padding: 20px 22px 24px;
+}
+
+.favorites-empty {
+  padding: 24px 0;
+  color: #8aa3ac;
+  text-align: center;
+}
+
+.favorite-item {
+  position: relative;
+  padding: 14px 15px;
+  border: 1px solid rgba(72, 116, 128, 0.14);
+  border-radius: 8px;
+  background: #fbfefe;
+}
+
+.favorite-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #78939d;
+  font-size: 11px;
+}
+
+.favorite-item p {
+  margin: 10px 0 0;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.favorite-item .icon-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+}
+
+.home-button,
+.new-chat-button,
+.send-button,
+.from-user .bubble,
+.save-button,
+.session-item.is-active .session-dot,
+.typing-bubble span {
+  background: var(--accent);
+}
+
+.home-button:hover,
+.new-chat-button:hover,
+.send-button:hover:not(:disabled),
+.save-button:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(0.9);
+}
+
+.favorite-toggle.is-active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
 /* Soft blue-cyan eye-care theme */
 :root {
   color: #26333c;
@@ -963,6 +1062,29 @@ body {
 
 .from-user .bubble time {
   color: rgba(251, 254, 255, 0.72);
+}
+
+.reasoning {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(72, 116, 128, 0.14);
+  border-radius: 8px;
+  color: #5e7c88;
+  background: rgba(226, 239, 241, 0.5);
+}
+
+.reasoning summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reasoning p {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .typing-bubble span {

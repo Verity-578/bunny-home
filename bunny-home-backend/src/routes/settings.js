@@ -23,6 +23,10 @@ router.put(
       patch.systemPrompt = input.systemPrompt.trim();
     }
 
+    if (typeof input.themeColor === 'string' && input.themeColor.trim()) {
+      patch.themeColor = input.themeColor.trim();
+    }
+
     const numberFields = [
       'temperature',
       'maxContextRounds',
