@@ -1,12 +1,21 @@
 import { Router } from 'express';
 
 import { authStatusFromRequest } from '../auth.js';
+import { asyncHandler } from '../asyncHandler.js';
+import { storage } from '../storage.js';
 
 const router = Router();
 
-router.get('/status', (req, res) => {
-  res.json(authStatusFromRequest(req));
-});
+router.get(
+  '/status',
+  asyncHandler(async (req, res) => {
+    const settings = await storage.getSettings();
+    res.json({
+      ...authStatusFromRequest(req),
+      name: settings.bunnyName || 'Bunny',
+    });
+  }),
+);
 
 router.post('/verify', (req, res) => {
   const password = process.env.APP_PASSWORD?.trim();

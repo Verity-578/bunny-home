@@ -33,6 +33,9 @@ router.put(
     if (typeof input.languageStylePrompt === 'string') {
       patch.languageStylePrompt = input.languageStylePrompt.trim();
     }
+    if (typeof input.bunnyName === 'string') {
+      patch.bunnyName = input.bunnyName.trim() || 'Bunny';
+    }
     if (typeof input.proactiveQuietStart === 'string') {
       patch.proactiveQuietStart = input.proactiveQuietStart.trim();
     }

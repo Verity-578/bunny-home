@@ -22,6 +22,7 @@ export function buildFullPrompt({ settings, messages, memories, memoryLibraryTex
     .join('\n');
 
   const sections = [persona];
+  if (settings.bunnyName) sections.unshift(`你的名字是 ${settings.bunnyName}。`);
   if (languageStyle) sections.push(`【语言风格】\n${languageStyle}`);
   sections.push(`当前时间：${new Date().toLocaleString('zh-CN', { hour12: false })}`);
   if (memoryLibraryText) sections.push(`【个人记忆库】\n${memoryLibraryText}`);

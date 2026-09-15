@@ -76,9 +76,11 @@ export default function App() {
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [nowLabel, setNowLabel] = useState('');
+  const [authName, setAuthName] = useState('Bunny');
   const bottomRef = useRef(null);
 
   const activeSession = sessions.find((session) => session.id === activeId) || null;
+  const displayName = settings?.bunnyName || authName || 'Bunny';
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +88,7 @@ export default function App() {
       .then((status) => {
         if (cancelled) return;
         setAuthState(status.required && !status.authenticated ? 'locked' : 'ready');
+        if (status.name) setAuthName(status.name);
       })
       .catch(() => {
         if (!cancelled) setAuthState('ready');
@@ -186,6 +189,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('bunny_model', model);
   }, [model]);
+
+  useEffect(() => {
+    document.title = `${displayName}'s Home`;
+  }, [displayName]);
 
   async function handleCreateSession() {
     try {
@@ -346,7 +353,7 @@ export default function App() {
   }
 
   if (authState !== 'ready') {
-    return <AuthGate state={authState} onUnlock={handleUnlock} />;
+    return <AuthGate state={authState} name={displayName} onUnlock={handleUnlock} />;
   }
 
   return (
@@ -358,13 +365,13 @@ export default function App() {
           <button
             type="button"
             className="icon-button home-button"
-            title="Bunny's Home"
+            title={`${displayName}'s Home`}
             onClick={() => setSidebarOpen(false)}
           >
             <House size={19} />
           </button>
           <div className="brand-copy">
-            <strong>Bunny's Home</strong>
+            <strong>{displayName}'s Home</strong>
             <span>我们的地方</span>
           </div>
           <button
@@ -448,7 +455,7 @@ export default function App() {
                 ) : (
                   <div className="session-title-block">
                     <h1>{activeSession.name}</h1>
-                    <p>和 Bunny 说话 · {nowLabel}</p>
+                    <p>和 {displayName} 说话 · {nowLabel}</p>
                   </div>
                 )}
 
@@ -480,7 +487,7 @@ export default function App() {
               </>
             ) : (
               <div className="session-title-block">
-                <h1>Bunny's Home</h1>
+                <h1>{displayName}'s Home</h1>
                 <p>还没有会话</p>
               </div>
             )}
@@ -639,6 +646,7 @@ export default function App() {
           models={models}
           model={model}
           onModelChange={setModel}
+          displayName={displayName}
           onClose={() => setSettingsOpen(false)}
           onSave={handleSaveSettings}
         />
@@ -654,14 +662,20 @@ export default function App() {
         />
       )}
       {memoryOpen && (
-        <MemoryPanel entries={memoryEntries} onClose={() => setMemoryOpen(false)} />
+        <MemoryPanel
+          entries={memoryEntries}
+          displayName={displayName}
+          onClose={() => setMemoryOpen(false)}
+        />
       )}
-      {searchOpen && <SearchPanel onClose={() => setSearchOpen(false)} />}
+      {searchOpen && (
+        <SearchPanel displayName={displayName} onClose={() => setSearchOpen(false)} />
+      )}
     </div>
   );
 }
 
-function AuthGate({ state, onUnlock }) {
+function AuthGate({ state, name = 'Bunny', onUnlock }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
@@ -671,7 +685,7 @@ function AuthGate({ state, onUnlock }) {
       <main className="auth-screen">
         <div className="auth-loading" aria-label="加载中">
           <Sparkles size={20} />
-          Bunny's Home
+          {name}'s Home
         </div>
       </main>
     );
@@ -698,7 +712,7 @@ function AuthGate({ state, onUnlock }) {
           <LockKeyhole size={24} />
         </div>
         <div className="auth-copy">
-          <strong>Bunny's Home</strong>
+          <strong>{name}'s Home</strong>
           <span>我们的地方</span>
         </div>
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -720,14 +734,20 @@ function AuthGate({ state, onUnlock }) {
   );
 }
 
-function SearchPanel({ onClose }) {
+function SearchPanel({ displayName = 'Bunny', onClose }) {
   const [query, setQuery] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [scope, setScope] = useState('all');
+  const [selectedScopes, setSelectedScopes] = useState(['messages', 'memories', 'favorites']);
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  function toggleScope(name) {
+    setSelectedScopes((current) =>
+      current.includes(name) ? current.filter((item) => item !== name) : [...current, name],
+    );
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -735,6 +755,8 @@ function SearchPanel({ onClose }) {
     setBusy(true);
     setError('');
     try {
+      const scope =
+        selectedScopes.length === 3 ? 'all' : selectedScopes.join(',');
       const data = await searchContent({ query: query.trim(), scope, from, to });
       setResults(data);
     } catch (err) {
@@ -772,15 +794,53 @@ function SearchPanel({ onClose }) {
               <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
             </label>
           </div>
-          <label className="field">
-            <span>范围</span>
-            <select value={scope} onChange={(event) => setScope(event.target.value)}>
-              <option value="all">聊天 + 记忆</option>
-              <option value="messages">仅聊天</option>
-              <option value="memories">仅记忆</option>
-              <option value="favorites">仅收藏</option>
-            </select>
-          </label>
+          <div className="field">
+            <span>搜索范围</span>
+            <div className="scope-checkboxes">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={
+                    selectedScopes.includes('messages') &&
+                    selectedScopes.includes('memories') &&
+                    selectedScopes.includes('favorites')
+                  }
+                  onChange={(event) =>
+                    setSelectedScopes(
+                      event.target.checked
+                        ? ['messages', 'memories', 'favorites']
+                        : [],
+                    )
+                  }
+                />
+                全选
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={selectedScopes.includes('messages')}
+                  onChange={(event) => toggleScope('messages')}
+                />
+                聊天
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={selectedScopes.includes('memories')}
+                  onChange={(event) => toggleScope('memories')}
+                />
+                记忆
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={selectedScopes.includes('favorites')}
+                  onChange={(event) => toggleScope('favorites')}
+                />
+                收藏
+              </label>
+            </div>
+          </div>
           <button type="submit" className="save-button" disabled={!query.trim() || busy}>
             {busy ? '搜索中…' : '搜索'}
           </button>
@@ -799,7 +859,7 @@ function SearchPanel({ onClose }) {
               <article className="search-result" key={`m-${item.id}`}>
                 <div className="memory-meta">
                   <strong>{item.sessionName || '对话'}</strong>
-                  <span>{item.role === 'user' ? '用户' : 'Bunny'}</span>
+                  <span>{item.role === 'user' ? '用户' : displayName}</span>
                   <time>{formatTime(item.createdAt)}</time>
                 </div>
                 <p>{item.content}</p>
@@ -833,14 +893,14 @@ function SearchPanel({ onClose }) {
   );
 }
 
-function MemoryPanel({ entries, onClose }) {
+function MemoryPanel({ entries, displayName = 'Bunny', onClose }) {
   return (
     <div className="drawer-layer">
       <div className="settings-panel" role="dialog" aria-modal="true" aria-label="记忆库">
         <div className="drawer-header">
           <div>
             <h2>记忆库</h2>
-            <p>Bunny 记得的事，和她写下的日记</p>
+            <p>{displayName} 记得的事，和她写下的日记</p>
           </div>
           <button type="button" className="icon-button" title="关闭" onClick={onClose}>
             <X size={19} />
@@ -919,7 +979,15 @@ function FavoritesPanel({ favorites, onClose, onDelete }) {
   );
 }
 
-function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave }) {
+function SettingsPanel({
+  settings,
+  models,
+  model,
+  onModelChange,
+  displayName = 'Bunny',
+  onClose,
+  onSave,
+}) {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('system');
@@ -944,6 +1012,7 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
         memoryCollectionEnabled: Boolean(settings.memoryCollectionEnabled),
         memoryEveryMessages: settings.memoryEveryMessages ?? 8,
         memorySharedAcrossSessions: Boolean(settings.memorySharedAcrossSessions),
+        bunnyName: settings.bunnyName || 'Bunny',
       });
     }
   }, [settings]);
@@ -1003,6 +1072,13 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
           {activeTab === 'system' && (
             <>
           <label className="field">
+            <span>TA 的昵称</span>
+            <input
+              value={form?.bunnyName || ''}
+              onChange={(event) => update('bunnyName', event.target.value)}
+            />
+          </label>
+          <label className="field">
             <span>当前模型</span>
             <select value={model} onChange={(event) => onModelChange(event.target.value)}>
               {models.map((option) => (
@@ -1048,7 +1124,7 @@ function SettingsPanel({ settings, models, model, onModelChange, onClose, onSave
             <label className="toggle-row">
               <span>
                 <strong>主动发消息</strong>
-                <small>间隔到达时，Bunny 会主动来找你</small>
+                <small>间隔到达时，{displayName} 会主动来找你</small>
               </span>
               <input
                 type="checkbox"

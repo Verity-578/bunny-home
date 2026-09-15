@@ -30,7 +30,13 @@ router.get(
   '/',
   asyncHandler(async (req, res) => {
     const query = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
-    const scope = typeof req.query.scope === 'string' ? req.query.scope : 'all';
+    const rawScope = typeof req.query.scope === 'string' ? req.query.scope : 'all';
+    const scopes = rawScope
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const wantsAll = rawScope === 'all' || scopes.includes('all');
+    const wants = (name) => wantsAll || scopes.includes(name);
     const from = normalizeDate(typeof req.query.from === 'string' ? req.query.from : '');
     const to = normalizeDate(typeof req.query.to === 'string' ? req.query.to : '', true);
     if (!query) throw badRequest('search_required', '请输入搜索关键词');
@@ -40,7 +46,7 @@ router.get(
     const favorites = [];
     const sessions = await storage.listSessions();
 
-    if (scope === 'all' || scope === 'messages') {
+    if (wants('messages')) {
       for (const session of sessions) {
         const history = await storage.listMessages(session.id, true);
         for (const message of history) {
@@ -59,7 +65,7 @@ router.get(
       }
     }
 
-    if (scope === 'all' || scope === 'memories') {
+    if (wants('memories')) {
       const entries = await storage.listMemoryEntries(2000);
       for (const entry of entries) {
         const haystack = `${entry.title || ''} ${entry.content} ${(entry.tags || []).join(' ')}`.toLowerCase();
@@ -69,7 +75,7 @@ router.get(
       }
     }
 
-    if (scope === 'all' || scope === 'favorites') {
+    if (wants('favorites')) {
       const allFavorites = await storage.listFavorites();
       for (const favorite of allFavorites) {
         if (!favorite.content.toLowerCase().includes(query)) continue;

@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
   memoryCollectionEnabled: true,
   memoryEveryMessages: 8,
   memorySharedAcrossSessions: true,
+  bunnyName: 'Bunny',
 };
 
 const SETTING_FIELDS = {
@@ -47,6 +48,7 @@ const SETTING_FIELDS = {
   memoryCollectionEnabled: 'memory_collection_enabled',
   memoryEveryMessages: 'memory_every_messages',
   memorySharedAcrossSessions: 'memory_shared_across_sessions',
+  bunnyName: 'bunny_name',
 };
 
 const sessionSelect = `
@@ -119,6 +121,7 @@ export class SqliteStore {
         memory_collection_enabled INTEGER NOT NULL DEFAULT 1,
         memory_every_messages INTEGER NOT NULL DEFAULT 8,
         memory_shared_across_sessions INTEGER NOT NULL DEFAULT 1,
+        bunny_name TEXT NOT NULL DEFAULT 'Bunny',
         updated_at TEXT NOT NULL
       );
 
@@ -163,6 +166,7 @@ export class SqliteStore {
     this.ensureColumn('settings', 'memory_collection_enabled', 'INTEGER NOT NULL DEFAULT 1');
     this.ensureColumn('settings', 'memory_every_messages', 'INTEGER NOT NULL DEFAULT 8');
     this.ensureColumn('settings', 'memory_shared_across_sessions', 'INTEGER NOT NULL DEFAULT 1');
+    this.ensureColumn('settings', 'bunny_name', "TEXT NOT NULL DEFAULT 'Bunny'");
   }
 
   ensureColumn(table, column, definition) {
@@ -184,8 +188,9 @@ export class SqliteStore {
           max_reply_tokens, theme_color, persona_prompt, language_style_prompt,
           proactive_enabled, proactive_interval_minutes, proactive_batch_count,
           proactive_quiet_start, proactive_quiet_end, last_proactive_at,
-          memory_collection_enabled, memory_every_messages, memory_shared_across_sessions, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          memory_collection_enabled, memory_every_messages, memory_shared_across_sessions,
+          bunny_name, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         1,
@@ -209,6 +214,7 @@ export class SqliteStore {
         DEFAULT_SETTINGS.memoryCollectionEnabled ? 1 : 0,
         DEFAULT_SETTINGS.memoryEveryMessages,
         DEFAULT_SETTINGS.memorySharedAcrossSessions ? 1 : 0,
+        DEFAULT_SETTINGS.bunnyName,
         nowIso(),
       );
   }
@@ -365,6 +371,7 @@ export class SqliteStore {
           memory_collection_enabled AS memoryCollectionEnabled,
           memory_every_messages AS memoryEveryMessages,
           memory_shared_across_sessions AS memorySharedAcrossSessions,
+          bunny_name AS bunnyName,
           updated_at AS updatedAt
         FROM settings
         WHERE id = 1
@@ -380,6 +387,7 @@ export class SqliteStore {
       memoryCollectionEnabled: Boolean(row.memoryCollectionEnabled),
       memoryEveryMessages: Number(row.memoryEveryMessages || 8),
       memorySharedAcrossSessions: Boolean(row.memorySharedAcrossSessions),
+      bunnyName: row.bunnyName || DEFAULT_SETTINGS.bunnyName,
     };
   }
 
