@@ -968,13 +968,32 @@ button {
   transition: opacity 140ms ease, background 140ms ease;
 }
 
+.edit-toggle {
+  position: absolute;
+  top: 8px;
+  left: 40px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: #8aa3ac;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease;
+}
+
 .bubble {
   position: relative;
 }
 
 .bubble:hover .favorite-toggle,
 .favorite-toggle.is-active,
-.bubble:hover .regenerate-toggle {
+.bubble:hover .regenerate-toggle,
+.bubble:hover .edit-toggle {
   opacity: 1;
 }
 
@@ -1086,6 +1105,71 @@ button {
   color: #2e7d91;
   background: rgba(46, 125, 145, 0.1);
   font-size: 11px;
+}
+
+.version-area {
+  margin-top: 10px;
+}
+
+.version-toggle {
+  padding: 0;
+  border: 0;
+  color: #6e8995;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.version-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.version-item {
+  padding: 9px 10px;
+  border-left: 2px solid rgba(72, 116, 128, 0.18);
+  color: #607b87;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.version-item span {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.version-item p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.edit-preview {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid rgba(72, 116, 128, 0.14);
+  border-radius: 8px;
+  color: #52717c;
+  background: #f4fbfc;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.quick-instructions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.quick-instructions button {
+  padding: 6px 9px;
+  border: 1px solid rgba(72, 116, 128, 0.16);
+  border-radius: 999px;
+  color: #52717c;
+  background: #f8fdfd;
+  cursor: pointer;
+  font-size: 12px;
 }
 
 .search-body {
@@ -1273,7 +1357,7 @@ body {
 .from-user .bubble {
   color: #fbfeff;
   background: #3f8393;
-  padding: 12px 15px 9px;
+  padding: 34px 44px 9px 15px;
 }
 
 .from-bunny .bubble {

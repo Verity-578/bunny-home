@@ -86,6 +86,13 @@ export function regenerateMessage({ sessionId, model }) {
   });
 }
 
+export function editMessage({ sessionId, messageId, instruction, model }) {
+  return apiRequest(`/api/sessions/${sessionId}/messages/${messageId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ instruction, model }),
+  });
+}
+
 export function getSettings() {
   return apiRequest('/api/settings');
 }

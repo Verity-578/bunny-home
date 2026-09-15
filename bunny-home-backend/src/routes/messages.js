@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { badRequest, notFound } from '../errors.js';
-import { regenerateReply, runChat } from '../services/chat.js';
+import { editTailMessage, regenerateReply, runChat } from '../services/chat.js';
 import { storage } from '../storage.js';
 
 const router = Router();
@@ -37,6 +37,22 @@ router.post(
     const model = typeof req.body?.model === 'string' ? req.body.model : 'local';
     const message = await regenerateReply({ sessionId: req.params.sessionId, model });
     res.status(201).json({ message });
+  }),
+);
+
+router.patch(
+  '/:sessionId/messages/:messageId',
+  asyncHandler(async (req, res) => {
+    const instruction =
+      typeof req.body?.instruction === 'string' ? req.body.instruction.trim() : '';
+    const model = typeof req.body?.model === 'string' ? req.body.model : 'local';
+    const message = await editTailMessage({
+      sessionId: req.params.sessionId,
+      messageId: req.params.messageId,
+      instruction,
+      model,
+    });
+    res.json({ message });
   }),
 );
 

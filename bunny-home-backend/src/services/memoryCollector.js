@@ -29,7 +29,9 @@ export async function maybeCollectMemory({ sessionId }) {
   try {
     const settings = await storage.getSettings();
     if (!settings.memoryCollectionEnabled) return;
-    const messages = await storage.listMessages(sessionId, true);
+    const messages = (await storage.listMessages(sessionId, true)).filter(
+      (message) => message.isCurrent && message.locked,
+    );
     const threshold = Math.max(2, Number(settings.memoryEveryMessages) || 8);
     if (messages.length < threshold) return;
 

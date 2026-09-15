@@ -21,6 +21,7 @@ import {
 import {
   addFavorite,
   createSession,
+  editMessage,
   deleteFavorite,
   deleteSession,
   getAuthStatus,
@@ -77,10 +78,13 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [nowLabel, setNowLabel] = useState('');
   const [authName, setAuthName] = useState('Bunny');
+  const [expandedGroups, setExpandedGroups] = useState({});
+  const [editingMessage, setEditingMessage] = useState(null);
   const bottomRef = useRef(null);
 
   const activeSession = sessions.find((session) => session.id === activeId) || null;
   const displayName = settings?.bunnyName || authName || 'Bunny';
+  const currentMessages = messages.filter((message) => message.isCurrent !== false);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,18 +281,41 @@ export default function App() {
     if (!activeSession || isSending) return;
     setIsSending(true);
     try {
-      const data = await regenerateMessage({
+      await regenerateMessage({
         sessionId: activeSession.id,
         model,
       });
-      setMessages((current) =>
-        current.map((item) => (item.id === message.id ? data.message : item)),
-      );
+      const data = await listMessages(activeSession.id);
+      setMessages(data.messages || []);
     } catch (error) {
       setConnectionError(error.message);
     } finally {
       setIsSending(false);
     }
+  }
+
+  async function handleEditMessage(message, instruction) {
+    if (!activeSession || isSending) return;
+    setIsSending(true);
+    try {
+      await editMessage({
+        sessionId: activeSession.id,
+        messageId: message.id,
+        instruction,
+        model,
+      });
+      const data = await listMessages(activeSession.id);
+      setMessages(data.messages || []);
+      setEditingMessage(null);
+    } catch (error) {
+      setConnectionError(error.message);
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  function toggleVersions(groupId) {
+    setExpandedGroups((current) => ({ ...current, [groupId]: !current[groupId] }));
   }
 
   async function handleSaveSettings(nextSettings) {
@@ -556,15 +583,20 @@ export default function App() {
               </div>
             )}
 
-            {messages.map((message, messageIndex) => (
-              <article
-                key={message.id}
-                className={`message-row ${message.role === 'assistant' ? 'from-bunny' : 'from-user'}`}
-              >
-                <div className="bubble">
-                  {message.role === 'assistant' &&
-                    !isSending &&
-                    messageIndex === messages.length - 1 && (
+            {currentMessages.map((message, messageIndex) => {
+              const versions = messages.filter(
+                (item) =>
+                  item.versionGroupId === message.versionGroupId && item.id !== message.id,
+              );
+              const isTail =
+                messageIndex === currentMessages.length - 1 && message.locked !== true;
+              return (
+                <article
+                  key={message.id}
+                  className={`message-row ${message.role === 'assistant' ? 'from-bunny' : 'from-user'}`}
+                >
+                  <div className="bubble">
+                    {message.role === 'assistant' && !isSending && isTail && (
                       <button
                         type="button"
                         className="regenerate-toggle"
@@ -574,31 +606,65 @@ export default function App() {
                         <RefreshCw size={14} />
                       </button>
                     )}
-                  <button
-                    type="button"
-                    className={`favorite-toggle ${
-                      favorites.some((favorite) => favorite.messageId === message.id) ? 'is-active' : ''
-                    }`}
-                    title="收藏这条消息"
-                    onClick={() => handleToggleFavorite(message)}
-                  >
-                    {favorites.some((favorite) => favorite.messageId === message.id) ? (
-                      <BookmarkCheck size={16} />
-                    ) : (
-                      <Bookmark size={16} />
+                    {!isSending && isTail && (
+                      <button
+                        type="button"
+                        className="edit-toggle"
+                        title="修改这条消息"
+                        onClick={() => setEditingMessage(message)}
+                      >
+                        <Pencil size={14} />
+                      </button>
                     )}
-                  </button>
-                  <p>{message.content}</p>
-                  {message.reasoningContent && (
-                    <details className="reasoning">
-                      <summary>思考过程</summary>
-                      <p>{message.reasoningContent}</p>
-                    </details>
-                  )}
-                  <time>{formatTime(message.createdAt)}</time>
-                </div>
-              </article>
-            ))}
+                    <button
+                      type="button"
+                      className={`favorite-toggle ${
+                        favorites.some((favorite) => favorite.messageId === message.id)
+                          ? 'is-active'
+                          : ''
+                      }`}
+                      title="收藏这条消息"
+                      onClick={() => handleToggleFavorite(message)}
+                    >
+                      {favorites.some((favorite) => favorite.messageId === message.id) ? (
+                        <BookmarkCheck size={16} />
+                      ) : (
+                        <Bookmark size={16} />
+                      )}
+                    </button>
+                    <p>{message.content}</p>
+                    {message.reasoningContent && (
+                      <details className="reasoning">
+                        <summary>思考过程</summary>
+                        <p>{message.reasoningContent}</p>
+                      </details>
+                    )}
+                    {versions.length > 0 && (
+                      <div className="version-area">
+                        <button
+                          type="button"
+                          className="version-toggle"
+                          onClick={() => toggleVersions(message.versionGroupId)}
+                        >
+                          共 {versions.length + 1} 个版本 · 查看旧版本
+                        </button>
+                        {expandedGroups[message.versionGroupId] && (
+                          <div className="version-list">
+                            {versions.map((version) => (
+                              <div className="version-item" key={version.id}>
+                                <span>版本 {version.versionNumber}</span>
+                                <p>{version.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <time>{formatTime(message.createdAt)}</time>
+                  </div>
+                </article>
+              );
+            })}
 
             {isSending && (
               <div className="message-row from-bunny">
@@ -671,6 +737,13 @@ export default function App() {
       {searchOpen && (
         <SearchPanel displayName={displayName} onClose={() => setSearchOpen(false)} />
       )}
+      {editingMessage && (
+        <EditMessagePanel
+          message={editingMessage}
+          onClose={() => setEditingMessage(null)}
+          onApply={(instruction) => handleEditMessage(editingMessage, instruction)}
+        />
+      )}
     </div>
   );
 }
@@ -731,6 +804,71 @@ function AuthGate({ state, name = 'Bunny', onUnlock }) {
         {error && <p className="auth-error">{error}</p>}
       </div>
     </main>
+  );
+}
+
+function EditMessagePanel({ message, onClose, onApply }) {
+  const [instruction, setInstruction] = useState('');
+  const [busy, setBusy] = useState(false);
+  const quickInstructions = [
+    '短一点',
+    '长一点',
+    '换个方向',
+    '回顾设定',
+    '更像日常聊天',
+    '保留情绪但更自然',
+    '不要重复之前的话',
+    '语气更温柔',
+  ];
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!instruction.trim() || busy) return;
+    setBusy(true);
+    try {
+      await onApply(instruction.trim());
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="drawer-layer">
+      <form className="settings-panel" role="dialog" aria-modal="true" onSubmit={handleSubmit}>
+        <div className="drawer-header">
+          <div>
+            <h2>修改最后一条消息</h2>
+            <p>{message.role === 'user' ? '你的消息' : 'Bunny 的回复'}</p>
+          </div>
+          <button type="button" className="icon-button" title="关闭" onClick={onClose}>
+            <X size={19} />
+          </button>
+        </div>
+        <div className="settings-body">
+          <div className="edit-preview">{message.content}</div>
+          <div className="quick-instructions">
+            {quickInstructions.map((item) => (
+              <button type="button" key={item} onClick={() => setInstruction(item)}>
+                {item}
+              </button>
+            ))}
+          </div>
+          <label className="field">
+            <span>修改指示</span>
+            <textarea
+              value={instruction}
+              onChange={(event) => setInstruction(event.target.value)}
+              placeholder="也可以输入自定义修改要求"
+              rows={4}
+              autoFocus
+            />
+          </label>
+          <button type="submit" className="save-button" disabled={!instruction.trim() || busy}>
+            {busy ? '修改中…' : '按指示修改'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

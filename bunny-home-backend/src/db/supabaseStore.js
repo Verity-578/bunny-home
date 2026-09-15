@@ -71,6 +71,11 @@ function mapMessage(row) {
     content: row.content,
     reasoningContent: row.reasoning_content,
     visible: row.visible,
+    versionGroupId: row.version_group_id,
+    versionNumber: Number(row.version_number || 1),
+    isCurrent: Boolean(row.is_current),
+    locked: Boolean(row.locked),
+    editedFromId: row.edited_from_id,
     createdAt: row.created_at,
   };
 }
@@ -205,16 +210,33 @@ export class SupabaseStore {
     return Boolean(data);
   }
 
-  async addMessage({ sessionId, role, content, reasoningContent = null, visible = true }) {
+  async addMessage({
+    sessionId,
+    role,
+    content,
+    reasoningContent = null,
+    visible = true,
+    versionGroupId = null,
+    versionNumber = 1,
+    isCurrent = true,
+    locked = false,
+    editedFromId = null,
+  }) {
+    const id = randomUUID();
     const { data, error } = await this.supabase
       .from('messages')
       .insert({
-        id: randomUUID(),
+        id,
         session_id: sessionId,
         role,
         content,
         reasoning_content: reasoningContent,
         visible,
+        version_group_id: versionGroupId || id,
+        version_number: versionNumber,
+        is_current: isCurrent,
+        locked,
+        edited_from_id: editedFromId,
         created_at: nowIso(),
       })
       .select()
@@ -245,6 +267,22 @@ export class SupabaseStore {
     const { data, error } = await query;
     if (error) throw databaseError(error);
     return (data || []).map(mapMessage);
+  }
+
+  async lockSessionMessages(sessionId) {
+    const { error } = await this.supabase
+      .from('messages')
+      .update({ locked: true })
+      .eq('session_id', sessionId);
+    if (error) throw databaseError(error);
+  }
+
+  async supersedeMessageGroup(groupId) {
+    const { error } = await this.supabase
+      .from('messages')
+      .update({ is_current: false })
+      .eq('version_group_id', groupId);
+    if (error) throw databaseError(error);
   }
 
   async hideMessages(messages) {

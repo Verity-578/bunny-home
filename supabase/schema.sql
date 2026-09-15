@@ -17,11 +17,35 @@ create table public.messages (
   content text not null,
   reasoning_content text,
   visible boolean not null default true,
+  version_group_id uuid,
+  version_number integer not null default 1,
+  is_current boolean not null default true,
+  locked boolean not null default false,
+  edited_from_id uuid,
   created_at timestamptz not null default now()
 );
 
 create index if not exists idx_messages_session
   on public.messages(session_id, created_at);
+
+alter table public.messages
+  add column if not exists version_group_id uuid;
+
+alter table public.messages
+  add column if not exists version_number integer not null default 1;
+
+alter table public.messages
+  add column if not exists is_current boolean not null default true;
+
+alter table public.messages
+  add column if not exists locked boolean not null default false;
+
+alter table public.messages
+  add column if not exists edited_from_id uuid;
+
+update public.messages
+  set version_group_id = id
+  where version_group_id is null;
 
 create table public.memories (
   id uuid primary key default gen_random_uuid(),

@@ -83,9 +83,15 @@ export async function runChat({ sessionId, message, model = 'local' }) {
   if (!getModelDefinition(model)) throw notFound('未知模型');
 
   const settings = await storage.getSettings();
+  await storage.lockSessionMessages(sessionId);
+  if (settings.memoryCollectionEnabled) {
+    setTimeout(() => {
+      maybeCollectMemory({ sessionId }).catch((error) => console.error('memory collect', error));
+    }, 0);
+  }
   await storage.addMessage({ sessionId, role: 'user', content: message });
 
-  let messages = await storage.listMessages(sessionId, true);
+  let messages = (await storage.listMessages(sessionId, true)).filter((item) => item.isCurrent);
   messages = await compressIfNeeded({ sessionId, settings, messages, message });
   const memories = await storage.listMemories(10);
   const memoryLibraryText = await getMemoryLibraryText({ sessionId, settings });
@@ -106,11 +112,6 @@ export async function runChat({ sessionId, message, model = 'local' }) {
     content: result.content,
     reasoningContent: result.reasoningContent,
   });
-  if (settings.memoryCollectionEnabled) {
-    setTimeout(() => {
-      maybeCollectMemory({ sessionId }).catch((error) => console.error('memory collect', error));
-    }, 0);
-  }
   return assistantMessage;
 }
 
@@ -128,12 +129,15 @@ export async function regenerateReply({ sessionId, model = 'local' }) {
   const lastAssistantIndex = [...messages].reverse().findIndex((item) => item.role === 'assistant');
   if (lastAssistantIndex < 0) throw badRequest('nothing_to_regenerate', '没有可重新生成的消息');
   const lastAssistant = messages[messages.length - 1 - lastAssistantIndex];
+  if (lastAssistant.locked) {
+    throw badRequest('message_locked', '已经继续对话的消息不能再修改');
+  }
   if (messages[messages.length - 1 - lastAssistantIndex - 1]?.role !== 'user') {
     throw badRequest('nothing_to_regenerate', '没有可重新生成的上一条用户消息');
   }
 
-  await storage.deleteMessage(lastAssistant.id);
-  const history = await storage.listMessages(sessionId, true);
+  await storage.supersedeMessageGroup(lastAssistant.versionGroupId || lastAssistant.id);
+  const history = (await storage.listMessages(sessionId, true)).filter((item) => item.isCurrent);
   const userMessage = history[history.length - 1];
   const memories = await storage.listMemories(10);
   const memoryLibraryText = await getMemoryLibraryText({ sessionId, settings });
@@ -157,5 +161,57 @@ export async function regenerateReply({ sessionId, model = 'local' }) {
     role: 'assistant',
     content: result.content,
     reasoningContent: result.reasoningContent,
+    versionGroupId: lastAssistant.versionGroupId || lastAssistant.id,
+    versionNumber: (lastAssistant.versionNumber || 1) + 1,
+    isCurrent: true,
+    locked: false,
+  });
+}
+
+export async function editTailMessage({ sessionId, messageId, instruction, model = 'local' }) {
+  const settings = await storage.getSettings();
+  const messages = (await storage.listMessages(sessionId, true)).filter(
+    (message) => message.isCurrent,
+  );
+  const current = messages[messages.length - 1];
+  if (!current || current.id !== messageId) {
+    throw badRequest('message_not_tail', '只能修改最后一条消息');
+  }
+  if (current.locked) {
+    throw badRequest('message_locked', '已经继续对话的消息不能再修改');
+  }
+  if (!instruction.trim()) {
+    throw badRequest('instruction_required', '请输入修改指示');
+  }
+
+  const historyText = messages
+    .slice(-8)
+    .map((item) => `${item.role === 'user' ? '用户' : 'Bunny'}：${item.content}`)
+    .join('\n');
+  const fullPrompt =
+    `你是文字编辑助手。根据指示改写指定的这一条消息，保持它的角色和事实，只输出改写后的正文。\n` +
+    `【角色】${current.role === 'user' ? '用户' : 'Bunny'}\n` +
+    `【修改指示】${instruction}\n` +
+    `【近期对话】\n${historyText}`;
+  const result = await generateReply({
+    model,
+    message: current.content,
+    fullPrompt,
+    memoryText: '',
+    historyText,
+    settings: { ...settings, maxReplyTokens: Math.min(settings.maxReplyTokens, 1200) },
+  });
+
+  await storage.supersedeMessageGroup(current.versionGroupId || current.id);
+  return storage.addMessage({
+    sessionId,
+    role: current.role,
+    content: result.content,
+    reasoningContent: result.reasoningContent,
+    versionGroupId: current.versionGroupId || current.id,
+    versionNumber: (current.versionNumber || 1) + 1,
+    isCurrent: true,
+    locked: false,
+    editedFromId: current.id,
   });
 }

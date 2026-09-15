@@ -84,6 +84,11 @@ export class SqliteStore {
         content TEXT NOT NULL,
         reasoning_content TEXT,
         visible INTEGER NOT NULL DEFAULT 1,
+        version_group_id TEXT,
+        version_number INTEGER NOT NULL DEFAULT 1,
+        is_current INTEGER NOT NULL DEFAULT 1,
+        locked INTEGER NOT NULL DEFAULT 0,
+        edited_from_id TEXT,
         created_at TEXT NOT NULL
       );
 
@@ -167,6 +172,12 @@ export class SqliteStore {
     this.ensureColumn('settings', 'memory_every_messages', 'INTEGER NOT NULL DEFAULT 8');
     this.ensureColumn('settings', 'memory_shared_across_sessions', 'INTEGER NOT NULL DEFAULT 1');
     this.ensureColumn('settings', 'bunny_name', "TEXT NOT NULL DEFAULT 'Bunny'");
+    this.ensureColumn('messages', 'version_group_id', 'TEXT');
+    this.ensureColumn('messages', 'version_number', 'INTEGER NOT NULL DEFAULT 1');
+    this.ensureColumn('messages', 'is_current', 'INTEGER NOT NULL DEFAULT 1');
+    this.ensureColumn('messages', 'locked', 'INTEGER NOT NULL DEFAULT 0');
+    this.ensureColumn('messages', 'edited_from_id', 'TEXT');
+    this.db.exec('UPDATE messages SET version_group_id = id WHERE version_group_id IS NULL');
   }
 
   ensureColumn(table, column, definition) {
@@ -274,14 +285,42 @@ export class SqliteStore {
     return result.changes > 0;
   }
 
-  addMessage({ sessionId, role, content, reasoningContent = null, visible = true, createdAt = nowIso() }) {
+  addMessage({
+    sessionId,
+    role,
+    content,
+    reasoningContent = null,
+    visible = true,
+    versionGroupId = null,
+    versionNumber = 1,
+    isCurrent = true,
+    locked = false,
+    editedFromId = null,
+    createdAt = nowIso(),
+  }) {
     const id = randomUUID();
+    const groupId = versionGroupId || id;
     this.db
       .prepare(`
-        INSERT INTO messages (id, session_id, role, content, reasoning_content, visible, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO messages (
+          id, session_id, role, content, reasoning_content, visible,
+          version_group_id, version_number, is_current, locked, edited_from_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
-      .run(id, sessionId, role, content, reasoningContent, visible ? 1 : 0, createdAt);
+      .run(
+        id,
+        sessionId,
+        role,
+        content,
+        reasoningContent,
+        visible ? 1 : 0,
+        groupId,
+        versionNumber,
+        isCurrent ? 1 : 0,
+        locked ? 1 : 0,
+        editedFromId,
+        createdAt,
+      );
     this.db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(createdAt, sessionId);
     return this.getMessage(id);
   }
@@ -290,7 +329,10 @@ export class SqliteStore {
     return this.db
       .prepare(`
         SELECT id, session_id AS sessionId, role, content,
-          reasoning_content AS reasoningContent, visible, created_at AS createdAt
+          reasoning_content AS reasoningContent, visible,
+          version_group_id AS versionGroupId, version_number AS versionNumber,
+          is_current AS isCurrent, locked, edited_from_id AS editedFromId,
+          created_at AS createdAt
         FROM messages
         WHERE id = ?
       `)
@@ -300,12 +342,25 @@ export class SqliteStore {
   listMessages(sessionId, visibleOnly = true) {
     const sql = `
       SELECT id, session_id AS sessionId, role, content,
-        reasoning_content AS reasoningContent, visible, created_at AS createdAt
+        reasoning_content AS reasoningContent, visible,
+        version_group_id AS versionGroupId, version_number AS versionNumber,
+        is_current AS isCurrent, locked, edited_from_id AS editedFromId,
+        created_at AS createdAt
       FROM messages
       WHERE session_id = ? ${visibleOnly ? 'AND visible = 1' : ''}
       ORDER BY created_at ASC
     `;
     return this.db.prepare(sql).all(sessionId);
+  }
+
+  lockSessionMessages(sessionId) {
+    this.db.prepare('UPDATE messages SET locked = 1 WHERE session_id = ?').run(sessionId);
+  }
+
+  supersedeMessageGroup(groupId) {
+    this.db
+      .prepare('UPDATE messages SET is_current = 0 WHERE version_group_id = ?')
+      .run(groupId);
   }
 
   hideMessages(messages) {
